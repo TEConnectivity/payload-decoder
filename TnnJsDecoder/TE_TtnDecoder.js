@@ -150,7 +150,7 @@ function Decode8911EXAlgoBatt(decode, port, bytes) {
 }
 
 function DecodeSinglePoint(decode, port, bytes) {
-    if (port == 10) {
+    if (port == 10 || port == 30) {
         decode.bat = bytes[5];
 
 
@@ -206,15 +206,21 @@ function DecodeSinglePoint(decode, port, bytes) {
                 }
             }
         }
-
-        decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString()+"°C";
-        if (decode.devtype.Output == "Float") {
-            decode.data = (arrayToFloat(bytes, 8, false)).toString() + unit;
+        if (port == 30) {
+            decode.msgType = "Keep Alive";
         }
-        else {
-            decode.data = (arrayToInt32(bytes, 8,  false) / 100.0).toString() + unit;
+        else if (port == 10) {
+            decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString() + "°C";
+            if (decode.devtype.Output == "Float") {
+                decode.data = (arrayToFloat(bytes, 8, false)).toString() + unit;
+            }
+            else {
+                decode.data = (arrayToInt32(bytes, 8, false) / 100.0).toString() + unit;
+            }
         }
-
+        else if (port == 20) {
+            decode.msgType = "Merge data";
+        }
         return true;
     }
     return false;
