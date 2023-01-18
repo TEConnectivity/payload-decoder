@@ -2,13 +2,21 @@
  function Decoder(bytes, port) {
     var decode = {}
 
-    if (DecodeFwRevision(decode, port, bytes) === false)
-        if (Decode8911EX(decode, port, bytes) === false)
-            if (Decode8931EX(decode, port, bytes) === false)
-                if (DecodeU8900(decode, port, bytes) === false)
-                    if (Decode8911EXAlgoBatt(decode, port, bytes) === false)
-                        if (DecodeSinglePoint(decode, port, bytes) === false)
-                            decode = 'Unknown';
+     if (DecodeFwRevision(decode, port, bytes) === false)
+         if (Decode8911EX(decode, port, bytes) === false)
+             if (Decode8931EX(decode, port, bytes) === false)
+                 if (DecodeU8900(decode, port, bytes) === false)
+                     if (Decode8911EXAlgoBatt(decode, port, bytes) === false)
+                         if (DecodeSinglePoint(decode, port, bytes) === false) {
+                             decode.val = 'Unknown';
+                             decode.port = port;
+                             decode.bytes = []
+
+                             for (i = 0; i < bytes.length; i++) {
+                                 decode.bytes.push(bytes[i].toString(16));
+                             }
+
+                         }
     return decode;
 
 }
