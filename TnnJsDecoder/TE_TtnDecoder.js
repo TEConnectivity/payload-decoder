@@ -7,16 +7,17 @@
              if (Decode8931EX(decode, port, bytes) === false)
                  if (DecodeU8900(decode, port, bytes) === false)
                      if (Decode8911EXAlgoBatt(decode, port, bytes) === false)
-                         if (DecodeSinglePoint(decode, port, bytes) === false) {
-                             decode.val = 'Unknown';
-                             decode.port = port;
-                             decode.bytes = []
+                         if (DecodeU8900Pof(decode, port, bytes) === false)
+                             if (DecodeSinglePoint(decode, port, bytes) === false) {
+                                 decode.val = 'Unknown';
+                                 decode.port = port;
+                                 decode.bytes = []
 
-                             for (i = 0; i < bytes.length; i++) {
-                                 decode.bytes.push(bytes[i].toString(16));
+                                 for (i = 0; i < bytes.length; i++) {
+                                     decode.bytes.push(bytes[i].toString(16));
+                                 }
+
                              }
-
-                         }
     return decode;
 
 }
@@ -156,7 +157,46 @@ function Decode8911EXAlgoBatt(decode, port, bytes) {
     }
     return false;
 }
+function DecodeU8900Pof(decode, port, bytes) {
+    if (port == 104) {
+        // MCU Flags
+        decode.pream = bytes[0] == 0x3C ? 'OK' : 'KO !!!';
+        decode.rst_cnt = arrayConverter(bytes, 1, 2, true);
+        decode.pof_tx = bytes[3] & 0x01 == 0x01 ? 'MCU POF !!!' : 'OK';
+        decode.pof_idle = (bitfield(bytes[4], 0) === 0) ? 'OK' : 'MCU POF !!!';
+        decode.pof_snsmeas = (bitfield(bytes[4], 1) === 0) ? 'OK' : 'MCU POF !!!';
+        decode.pof_batmeas = (bitfield(bytes[4], 2) === 0) ? 'OK' : 'MCU POF !!!';
 
+
+        decode.batt = arrayConverter(bytes, 5, 2, true) + 'mV';
+
+        if (bytes[7] === 0x00) {
+            decode.devstat = 'ok';
+        }
+        else {
+            decode.devstat = {};
+            decode.devstat.Meas = (bitfield(bytes[7], 7) === 0) ? 'OK' : 'err';
+            decode.devstat.Cal = (bitfield(bytes[7], 6) === 0) ? 'OK' : 'err';
+            decode.devstat.Unk = (bitfield(bytes[7], 5) === 0) ? 'OK' : 'err';
+            decode.devstat.Unsup = (bitfield(bytes[7], 4) === 0) ? 'OK' : 'err';
+        }
+
+        decode.batt_lvl = (bytes[8] & 0x0F) == 0xF ? 'ERROR' : (((bytes[8] & 0x0F) * 10) + '%');
+        decode.patbatt = bytes[9] == 0xA5 ? 'OK' : 'Corrupted';
+        decode.pattemp = bytes[9] == 0xA5 ? 'OK' : 'Corrupted';
+
+        decode.mcu_temp = arrayConverter(bytes, 10, 2, true, true) / 100.0 + '°C';
+        decode.pres = isNaN(arrayToFloat(bytes, 13)) ? 'ERROR' : round(arrayToFloat(bytes, 13), 3) + ' Bar';
+        decode.patend = bytes[17] == 0x5A ? 'OK' : 'KO !!! ';
+        var i = 0;
+        decode.zdata = [];
+        for (i = 0; i < bytes.length; i++) {
+            decode.zdata.push(bytes[i].toString(16));
+        }
+        return true;
+    }
+    return false;
+}
 function DecodeSinglePoint(decode, port, bytes) {
     if (port == 10 || port == 30) {
         decode.bat = bytes[5];
