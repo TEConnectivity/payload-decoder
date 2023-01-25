@@ -216,20 +216,29 @@ function DecodeOperationResponses(decode, port, bytes) {
              }
              decode.op = OperationRepsType[bytes[0]&0x3];
              decode.opFlag = [];
-             for (var i = 7; i >= 4; i--) {
+             for (var i = 7; i > 4; i--) {
                  if (bitfield(bytes[0], i) === 1) {
-                     decode.operation.push(OperationFlag[i]);
+                     decode.opFlag.push(OperationFlag[i]);
                  }
              }
                  var uuid = arrayToUint16(bytes, 1, false)
                  decode.uuid = uuid.toString(16);
                  var payload = bytes.slice(3)
                  switch (uuid) {
+                     case 0x2A24:
+                         decode.model = arrayToAscii(payload);
+                         break;
+                     case 0x2A25:
+                         decode.sn = arrayToAscii(payload);
+                         break;
                      case 0x2A26:
-                         decode.fwrev = '';
-                         for (var i = 0; i < payload.length; i++) {
-                             decode.fwrev += String.fromCharCode(payload[i]);
-                         }
+                         decode.fwrev = arrayToAscii(payload);
+                         break;
+                     case 0x2A27:
+                         decode.hwrev = arrayToAscii(payload);
+                         break;
+                     case 0x2A29:
+                         decode.manuf = arrayToAscii(payload);
                          break;
                      case 0xB302:
                          decode.measInt = payload[0].toString() + 'h '+payload[1].toString() + ' min'+payload[2].toString() + ' sec';
@@ -347,7 +356,13 @@ function getDevtype(u16devtype) {
     return devtype;
 }
 
-
+function arrayToAscii(arr, offset=0, size = arr.length - offset) {
+    var text = ''
+    for (var i = 0; i < size; i++) {
+        text += String.fromCharCode(arr[i + offset]);
+    }
+    return text
+}
 function round(value, decimal) {
     return Math.round(value * Math.pow(10, decimal)) / Math.pow(10, decimal);
 
