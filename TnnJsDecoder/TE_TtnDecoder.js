@@ -390,7 +390,7 @@ function arrayToFloatOld(arr, offset, littleEndian = true) {
 
 function arrayToFloat(arr, offset, littleEndian = true) {
     let view = new DataView(new ArrayBuffer(4));
-    for (let i = offset; i < 4; i++) {
+    for (let i = offset; i < offset+ 4; i++) {
         view.setUint8(i, arr[i]);
     }
     return view.getFloat32(0, littleEndian);
