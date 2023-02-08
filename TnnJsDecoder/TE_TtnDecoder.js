@@ -372,25 +372,35 @@ function hexToFloat(hex) {
     var e = (hex >> 23) & 0xFF;
     return s * (hex & 0x7fffff | 0x800000) * 1.0 / Math.pow(2, 23) * Math.pow(2, (e - 127))
 }
-function arrayToUint32(arr, offset, lsbfirst = true) {
-    return (arrayConverter(arr, offset, 4, lsbfirst, false));
+function arrayToUint32(arr, offset, littleEndian = true) {
+    return (arrayConverter(arr, offset, 4, littleEndian, false));
 }
-function arrayToUint16(arr, offset, lsbfirst = true) {
-    return (arrayConverter(arr, offset, 2, lsbfirst,false));
+function arrayToUint16(arr, offset, littleEndian = true) {
+    return (arrayConverter(arr, offset, 2, littleEndian,false));
 }
-function arrayToInt32(arr, offset, lsbfirst = true) {
-    return (arrayConverter(arr, offset, 4, lsbfirst, true));
+function arrayToInt32(arr, offset, littleEndian = true) {
+    return (arrayConverter(arr, offset, 4, littleEndian, true));
 }
-function arrayToInt16(arr, offset, lsbfirst = true) {
-    return (arrayConverter(arr, offset, 2, lsbfirst, true));
+function arrayToInt16(arr, offset, littleEndian = true) {
+    return (arrayConverter(arr, offset, 2, littleEndian, true));
 }
-function arrayToFloat(arr, offset, lsbfirst = true) {
-    return hexToFloat(arrayConverter(arr, offset, 4, lsbfirst,false));
+function arrayToFloatOld(arr, offset, littleEndian = true) {
+    return hexToFloat(arrayConverter(arr, offset, 4, littleEndian,false));
 }
-function arrayConverter(arr, offset, size, lsbfirst = true, isSigned = false) {
+
+function arrayToFloat(arr, offset, littleEndian = true) {
+    let view = new DataView(new ArrayBuffer(4));
+    for (let i = offset; i < 4; i++) {
+        view.setUint8(i, arr[i]);
+    }
+    return view.getFloat32(0, littleEndian);
+}
+
+
+function arrayConverter(arr, offset, size, littleEndian = true, isSigned = false) {
     var outputval = 0;
     for (var i = 0; i < size; i++) {
-        if (lsbfirst == false) {
+        if (littleEndian == false) {
             outputval |= arr[offset + size - i - 1] << (i * 8);
         }
         else {
