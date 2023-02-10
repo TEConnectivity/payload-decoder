@@ -343,6 +343,7 @@ function DecodeOperationResponses(decode, port, bytes) {
                          decode.Datalog.data = [];
                          for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize*(i+1)+4) ; i++) {
                              var dataN = {};
+                             dataN.index = decode.Datalog.index + i;
                              switch (decode.Datalog.type) {
                                  case "Temperature":
                                      dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false)/100.0;
