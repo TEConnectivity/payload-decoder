@@ -13,7 +13,7 @@ function Decoder(bytes, port) {
                                     if (DecodeKeepAlive(decode, port, bytes) === false) {
                                         decode.val = 'Unknown frame';
                                         decode.port = port;
-                                        decode.bytes = bytes.map(byte => byte.toString(16)).join('');
+                                        decode.bytes = bytes.map(byte => byte.toString(16)).join(',');
                                     }
                                   
     return decode;
@@ -242,12 +242,152 @@ function DecodeOperationResponses(decode, port, bytes) {
                          break;
                      case 0xB302:
                          decode.measInt = payload[0].toString() + 'h '+payload[1].toString() + ' min'+payload[2].toString() + ' sec';
-                            break;
+                         break;
+                     case 0x2A19:
+                         decode.batt = payload[0];
+                         break;
+                     case 0xCE01:
+                         var KeepAliveInterval = {
+                             0: "24h",
+                             1: "12h",
+                             2: "8h",
+                             3: "4h",
+                             4: "2h"
+                         }
+                         var KeepAliveMode = {
+                             0: "AnyTime",
+                             1: "IfSilent",
+                             2: "Disable"
+                         }
+                         decode.kaCfg = {};
+                         decode.kaCfg.mode = KeepAliveMode[(payload[0]>>3) & 0x3];
+                         decode.kaCfg.interval = KeepAliveInterval[payload[0] & 0x7];
+                         break;
+                     case 0xB201:
+                         var ThsSrc = {
+                             0: "MainRaw",
+                             1: "MainDelta",
+                             2: "SecondaryRaw",
+                             3: "SecondaryDelta",
+                             0xFF:"Error"
+                         }
+                         var ThsSel = {
+                             0: "Config",
+                             1: "Level",
+                             2: "MeasInterval",
+                             3: "ComMode",
+                             0xFF: "Error"
+                         }
+                         decode.ThsCfg = {};
+                         decode.ThsCfg.Src = ThsSrc[payload[0]];
+                         decode.ThsCfg.Sel = ThsSel[payload[1]];
+                         switch (decode.ThsCfg.Sel) {
+                             case "Config":
+                                 decode.ThsCfg.cfg = {};
+                                 decode.ThsCfg.cfg.eventFlag = bitfield(payload[2], 7);
+                                 decode.ThsCfg.cfg.enable = bitfield(payload[2], 6);
+                                 decode.ThsCfg.cfg.condition =( bitfield(payload[2], 5) == 1 )? '<' : '>';
+                                 decode.ThsCfg.cfg.autoclr = bitfield(payload[2], 4);
+                                 decode.ThsCfg.cfg.actionMeasIntEn = bitfield(payload[2], 3) 
+                                 decode.ThsCfg.cfg.actionAdvModeEn = bitfield(payload[2], 2) 
+                                 decode.ThsCfg.cfg.actionUplModeEn = bitfield(payload[2], 1) 
+                                 break;
+                             case "Level":
+                                 decode.ThsCfg.lvl = {};
+                                 if (payload.length - 2 >= 4) {
+                                     decode.ThsCfg.lvl.valf32 = arrayToFloat(payload, 2, false);
+                                     decode.ThsCfg.lvl.vali32 = arrayToInt32(payload, 2, false) / 100.0;
+
+                                     decode.ThsCfg.lvl.vali16 = arrayToInt16(payload, 4, false) / 100.0;
+                                 }
+                                 else {
+                                     decode.ThsCfg.lvl.err = "wrong size";
+                                 }
+                                 break;
+                             case "MeasInterval":
+                                 decode.ThsCfg.measInt = payload[2].toString() + 'h ' + payload[3].toString() + ' min' + payload[4].toString() + ' sec';
+                                 break;
+                             case "ComMode":
+                                 var ThsComBleMode = {
+                                     0: "Periodic",
+                                     1: "On Measure",
+                                     2: "ADV Silent"
+                                 }
+                                 var ThsComLoraMode = {
+                                     0: "On Measurement",
+                                     1: "Silent",
+                                     2: "Merge"
+                                 }
+                                 decode.ThsCfg.ComMode = {};
+                                 decode.ThsCfg.ComMode.ble = ThsComBleMode[payload[2]&0x03];
+                                 decode.ThsCfg.ComMode.lora = ThsComLoraMode[payload[3]&0x03];
+                                 break;
+                         }
+                         break;
+                     case 0xDB01:
+                         var DataLogDataType = {
+                             0: "Temperature",
+                             1: "MainData",
+                             2: "Temperature+MainData"
+                         }
+                         var DataLogDataSize = {
+                             0: 2,
+                             1: 4,
+                             2: 6,
+                         }
+                         decode.Datalog = {};
+                         decode.Datalog.type = DataLogDataType[payload[0]];
+                         decode.Datalog.index = arrayToUint16(payload, 1, false);
+                         decode.Datalog.length = payload[3];
+                         var dataSize = DataLogDataSize[payload[0]];
+                         decode.Datalog.data = [];
+                         for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize*(i+1)+4) ; i++) {
+                             var dataN = {};
+                             switch (decode.Datalog.type) {
+                                 case "Temperature":
+                                     dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false)/100.0;
+                                     break;
+                                 case "MainData":
+                                     dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4, false)/100.0;
+                                     dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4, false);
+                                     break;
+                                 case "Temperature+MainData":
+                                     dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
+                                     dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4 + 2, false) / 100.0;
+                                     dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4+2, false);
+                                     break;
+                                 default: break;
+                             }
+                             decode.Datalog.data.push(dataN);
+                         }
+                         break;
+                     case 0xF801:
+                         decode.DevEui = arrayToString(payload);
+                         break;
+                     case 0xF802:
+                         decode.AppEui = arrayToString(payload);
+                         break;
+                     case 0xF803:
+                         var RegionType = {
+                             0: "AS923",
+                             1: "AU915",
+                             2: "CN470",
+                             3: "CN779",
+                             4: "EU433",
+                             5: "EU868",
+                             6: "KR920",
+                             7: "IN865",
+                             8: "US915"
+                         }
+                         decode.Region = RegionType[payload[0]&0x0F];
+                         break;
+                     case 0xF804:
+                         decode.netId = arrayToString(payload);
+                         break;
                      default:
                          decode.payload = []
-                         for (var i = 0; i < payload.length; i++) {
-                             decode.payload.push(payload[i].toString(16));
-                         }
+                         decode.payload = arrayToString(payload);
+                         
                          break;
                  }
 
@@ -355,7 +495,12 @@ function getDevtype(u16devtype) {
     devtype.Unit = SensorUnitDict[((u16devtype >> 8) & 0x0F)];
     return devtype;
 }
+function arrayToString(arr, offset = 0, size = arr.length - offset) {
+    var text = ''
+    text = arr.slice(offset, offset+size).map(byte => byte.toString(16)).join(',');
 
+    return text
+}
 function arrayToAscii(arr, offset=0, size = arr.length - offset) {
     var text = ''
     for (var i = 0; i < size; i++) {
@@ -390,8 +535,8 @@ function arrayToFloatOld(arr, offset, littleEndian = true) {
 
 function arrayToFloat(arr, offset, littleEndian = true) {
     let view = new DataView(new ArrayBuffer(4));
-    for (let i = offset; i < offset+ 4; i++) {
-        view.setUint8(i, arr[i]);
+    for (let i = 0; i < 4; i++) {
+        view.setUint8(i, arr[i + offset]);
     }
     return view.getFloat32(0, littleEndian);
 }
