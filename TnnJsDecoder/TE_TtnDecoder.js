@@ -102,30 +102,8 @@ function Decode8911EX(decode, port, bytes) {
     return false;
 }
 
-//Preliminary
+
 function DecodeU8900(decode, port, bytes) {
-    if (port == 4) {
-        decode.bat = (bytes[1] & 0x0F) == 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
-
-        if (bytes[0] === 0x00) {
-            decode.devstat = 'normal';
-        }
-        else {
-            decode.devstat = {};
-            decode.devstat.Meas = (bitfield(bytes[0], 7) === 0) ? 'ok' : 'err';
-            decode.devstat.Cal = (bitfield(bytes[0], 6) === 0) ? 'ok' : 'err';
-            decode.devstat.Unk = (bitfield(bytes[0], 5) === 0) ? 'ok' : 'err';
-            decode.devstat.Unsup = (bitfield(bytes[0], 4) === 0) ? 'ok' : 'err';
-
-        }
-        decode.temp = (arrayConverter(bytes, 2, 2) == 0x7FFF) ? 'err' : (((arrayConverter(bytes, 2, 2, true, true)) / 10.0) + '°C');
-        decode.pres = isNaN(arrayToFloat(bytes, 4)) ? 'err' : round(arrayToFloat(bytes, 4), 3) + 'Bar';
-        return true;
-    }
-    return false;
-}
-//A-sample
-function DecodeU8900_A(decode, port, bytes) {
     if (port == 4) {
         decode.bat = (bytes[1] & 0x0F) == 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
 
