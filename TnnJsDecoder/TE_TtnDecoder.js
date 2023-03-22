@@ -23,15 +23,16 @@ function Decode8931EX(decode, port, bytes) {
     if (port == 5) {
         decode.bat = (bytes[1] & 0x0F) == 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
 
-        if (bytes[0] === 0x00) {
+        if (bytes[1]&0xF0 === 0x00) {
             decode.devstat = 'ok';
         }
         else {
             decode.devstat = {};
-            decode.devstat.rotEn = (bitfield(bytes[7], 7) == 1) ? 'enabled' : 'disabled';
-            decode.devstat.temp = (bitfield(bytes[7], 6) === 0) ? 'ok' : 'err';
-            decode.devstat.acc = (bitfield(bytes[7], 5) === 0) ? 'ok' : 'err';
+            decode.devstat.rotEn = (bitfield(bytes[1], 7) == 1) ? 'enabled' : 'disabled';
+            decode.devstat.temp = (bitfield(bytes[1], 6) === 0) ? 'ok' : 'err';
+            decode.devstat.acc = (bitfield(bytes[1], 5) === 0) ? 'ok' : 'err';
         }
+        decode.presetId = bytes[0];
         decode.temp = bytes[2] * 0.5 - 40 + '°C';
         decode.fftInfo = {};
         decode.fftInfo.BwMode = bytes[3] & 0x0F;
