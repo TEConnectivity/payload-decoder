@@ -113,7 +113,13 @@ function Decode8911EX(decode, port, bytes) {
     }
     return false;
 }
-
+function DecodeFwRevision(decode, port, bytes) {
+    if (port == 2) {      
+        decode.firmware_version = arrayToAscii(bytes);
+        return true;
+    }
+    return false;
+}
 
 function DecodeU8900(decode, port, bytes) {
     if (port == 4) {
@@ -548,16 +554,7 @@ function arrayConverter(arr, offset, size, littleEndian = true, isSigned = false
 
     return outputval;
 }
-function DecodeFwRevision(decode, port, bytes) {
-    if (port == 2) {
-        var str = '';
-        for (var i = 0; i < bytes.length; i += 1)
-            str += String.fromCharCode(bytes[i]);
-        decode.firmware_version = str;
-        return true;
-    }
-    return false;
-}
+
 function bitfield(val, offset) {
     return (val >> offset) & 0x01;
 }
