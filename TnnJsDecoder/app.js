@@ -22,15 +22,36 @@ var port = 10;
 
 bytes = Buffer.from('EyEAJwBjChc/et9m')
 bytes = new Array(0x13, 0x21, 0x00, 0x0A, 0x80, 0x62, 0x09, 0xF6, 0x3F, 0x86, 0x66, 0x66);
+
+//port 10  EyEALQhjCgw/gHNj  1321002d08630a0c3f807363    data
+//port 20  AColZGU4ZWFiMTdhZDVm  002a25646538656162313761643566 fw rev
+//port 30  /EyEARwhj keep alive 132100470863
+
+bytes = Buffer.from('EyEALQhjCgw/gHNj', 'base64')
+port = 50;
 var decode = Decoder(bytes, port);
+
+bytes = Buffer.from('AComZGU4ZWFiMTdhZDVm', 'base64')
+port = 20;
+decode = Decoder(bytes, port);
+
+bytes = Buffer.from('EyEARwhj', 'base64')
+port = 30;
+decode = Decoder(bytes, port);
 
 bytes = Buffer.from('AAp8Awg4ACZk7ABngAOQAfoACkAMeABLAA==', 'base64');//8931
 
+port = 4;
+bytes = new Array(0x00, 0x8A,0x0B,0x14,0xA6,0x41,0xC7,0x6C,0x80,0x3F)
+decode = Decoder(bytes, port);
 console.log(JSON.stringify(decode));
 
+
+port = 10;
+bytes = new Array( 0x80, 0x0a, 0xff, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff,0x7f)
+decode = Decoder(bytes, port);
 //  1321 000A 00 6209F63F866666
 var pause = 1;
-
 
 function Decoder(bytes, port) {
     var decode = {}
@@ -40,8 +61,14 @@ function Decoder(bytes, port) {
             if (Decode8931EX(decode, port, bytes) === false)
                 if (DecodeU8900(decode, port, bytes) === false)
                     if (Decode8911EXAlgoBatt(decode, port, bytes) === false)
-                        if (DecodeSinglePoint(decode, port, bytes) === false)
-                            decode = 'Unknown';
+                        if (DecodeU8900Pof(decode, port, bytes) === false)
+                            if (DecodeSinglePoint(decode, port, bytes) === false)
+                                if (DecodeOperationResponses(decode, port, bytes) === false)
+                                    if (DecodeKeepAlive(decode, port, bytes) === false) {
+                                        decode.val = 'Unknown';
+                                        decode.port = port;
+                                        decode.bytes = bytes.map(byte => byte.toString(16)).join('');
+                                    }
     return decode;
 
 }
@@ -181,78 +208,196 @@ function Decode8911EXAlgoBatt(decode, port, bytes) {
     }
     return false;
 }
+function DecodeU8900Pof(decode, port, bytes) {
+    if (port == 104) {
+        // MCU Flags
+        decode.pream = bytes[0] == 0x3C ? 'OK' : 'KO !!!';
+        decode.rst_cnt = arrayConverter(bytes, 1, 2, true);
+        decode.pof_tx = bytes[3] & 0x01 == 0x01 ? 'MCU POF !!!' : 'OK';
+        decode.pof_idle = (bitfield(bytes[4], 0) === 0) ? 'OK' : 'MCU POF !!!';
+        decode.pof_snsmeas = (bitfield(bytes[4], 1) === 0) ? 'OK' : 'MCU POF !!!';
+        decode.pof_batmeas = (bitfield(bytes[4], 2) === 0) ? 'OK' : 'MCU POF !!!';
 
-function DecodeSinglePoint(decode, port, bytes) {
-    if (port == 10) {
-        decode.bat = bytes[5];
 
+        decode.batt = arrayConverter(bytes, 5, 2, true) + 'mV';
 
-        var SwPlatformDict = {
-            0: "Error",
-            1: "Platform_21"
-        }
-        var SensorDict = {
-            0: "Error",
-            1: "Vibration",
-            2: "Temperature",
-            3: "Pressure"
-        }
-        var SensorUnitDict = {
-            0: "Error",
-            1: "g",
-            2: "°C",
-            3: "Bar"
-        }
-        var WirelessDict = {
-            0: "Error",
-            1: "BLE",
-            2: "BLE/LoRaWAN",
-        }
-        var OutputDict = {
-            0: "Error",
-            1: "Float",
-            2: "Integer"
-        }
-        var DevstatDict = {
-            7: "SnsErr",
-            6: "CfgErr",
-            5: "MisxErr",
-            4: "Condition",
-            3: "PrelPhase"
-        }
-        decode.devtype = {};
-        decode.devtype.Platform = SwPlatformDict[((arrayToUint16(bytes, 0, false) >> 12) & 0x0F)];
-        decode.devtype.Sensor = SensorDict[((arrayToUint16(bytes, 0, false) >> 8) & 0x0F)];
-        decode.devtype.Wireless = WirelessDict[((arrayToUint16(bytes, 0, false) >> 4) & 0x0F)];
-        decode.devtype.Output = OutputDict[(arrayToUint16(bytes, 0, false) & 0x0F)];
-        var unit = SensorUnitDict[((arrayToUint16(bytes, 0, false) >> 8) & 0x0F)];
-        decode.cnt = arrayToUint16(bytes, 2, false, false);
-
-        if (bytes[4] === 0x00) {
+        if (bytes[7] === 0x00) {
             decode.devstat = 'ok';
         }
         else {
-            decode.devstat = [];
-            for (var i = 7; i >= 3; i--) {
-                if (bitfield(bytes[4], i) === 1) {
-                    decode.devstat.push(DevstatDict[i]);
-                }
+            decode.devstat = {};
+            decode.devstat.Meas = (bitfield(bytes[7], 7) === 0) ? 'OK' : 'err';
+            decode.devstat.Cal = (bitfield(bytes[7], 6) === 0) ? 'OK' : 'err';
+            decode.devstat.Unk = (bitfield(bytes[7], 5) === 0) ? 'OK' : 'err';
+            decode.devstat.Unsup = (bitfield(bytes[7], 4) === 0) ? 'OK' : 'err';
+        }
+
+        decode.batt_lvl = (bytes[8] & 0x0F) == 0xF ? 'ERROR' : (((bytes[8] & 0x0F) * 10) + '%');
+        decode.patbatt = bytes[9] == 0xA5 ? 'OK' : 'Corrupted';
+        decode.pattemp = bytes[9] == 0xA5 ? 'OK' : 'Corrupted';
+
+        decode.mcu_temp = arrayConverter(bytes, 10, 2, true, true) / 100.0 + '°C';
+        decode.pres = isNaN(arrayToFloat(bytes, 13)) ? 'ERROR' : round(arrayToFloat(bytes, 13), 3) + ' Bar';
+        decode.patend = bytes[17] == 0x5A ? 'OK' : 'KO !!! ';
+        var i = 0;
+        decode.zdata = [];
+        for (i = 0; i < bytes.length; i++) {
+            decode.zdata.push(bytes[i].toString(16));
+        }
+        return true;
+    }
+    return false;
+}
+//port 10  EyEALQhjCgw/gHNj  1321002d08630a0c3f807363    data
+//port 20  AComZGU4ZWFiMTdhZDVm  00 2a 26 64 65 38 65 61 62 31 37 61 64 35 66 fw rev
+//port 30  /EyEARwhj keep alive 132100470863
+function DecodeOperationResponses(decode, port, bytes) {
+    var res = false;
+    if (port == 20) {
+        res = true;
+        var OperationRepsType = {
+            0: "Read",
+            1: "Write",
+            2: "Write+Read"
+        }
+        var OperationFlag = {
+            7: "UuidUnk",
+            6: "OpErr",
+            5: "ReadOnly",
+            4: "NetwErr",
+
+        }
+        decode.op = OperationRepsType[bytes[0] & 0x3];
+        decode.opFlag = [];
+        for (var i = 7; i >= 4; i--) {
+            if (bitfield(bytes[0], i) === 1) {
+                decode.operation.push(OperationFlag[i]);
             }
         }
+        var uuid = arrayToUint16(bytes, 1, false)
+        decode.uuid = uuid.toString(16);
+        var payload = bytes.slice(3)
+        switch (uuid) {
+            case 0x2A26:
+                decode.fwrev = '';
+                for (var i = 0; i < payload.length; i++) {
+                    decode.fwrev += String.fromCharCode(payload[i]);
+                }
+                break;
+            case 0xB302:
+                decode.measInt = payload[0].toString() + 'h ' + payload[1].toString() + ' min' + payload[2].toString() + ' sec';
+                break;
+            default:
+                decode.payload = []
+                for (var i = 0; i < payload.length; i++) {
+                    decode.payload.push(payload[i].toString(16));
+                }
+                break;
+        }
+
+
+    }
+    else {
+        res = false;
+    }
+    return res;
+}
+function DecodeKeepAlive(decode, port, bytes) {
+    if (port == 30) {
+        decode.msgType = "Keep Alive";
+        decode.devtype = {}
+        decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
+        decode.cnt = arrayToUint16(bytes, 2, false, false);
+        decode.devstat = []
+        decode.devstat = getDevstat(bytes[4])
+        decode.bat = bytes[5];
+
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+function DecodeSinglePoint(decode, port, bytes) {
+    if (port == 10) {
+        decode.devtype = {}
+        decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
+        decode.cnt = arrayToUint16(bytes, 2, false, false);
+        decode.devstat = []
+        decode.devstat = getDevstat(bytes[4])
+        decode.bat = bytes[5];
 
         decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString() + "°C";
         if (decode.devtype.Output == "Float") {
-            decode.data = (arrayToFloat(bytes, 8, false)).toString() + unit;
+            decode.data = (arrayToFloat(bytes, 8, false)).toString() + decode.devtype.Unit;
         }
         else {
-            decode.data = (arrayToInt32(bytes, 8, false) / 100.0).toString() + unit;
+            decode.data = (arrayToInt32(bytes, 8, false) / 100.0).toString() + decode.devtype.Unit;
         }
 
         return true;
     }
     return false;
 }
+function getDevstat(u8devstat) {
+    var devstat;
+    var DevstatDict = {
+        7: "SnsErr",
+        6: "CfgErr",
+        5: "MiscErr",
+        4: "Condition",
+        3: "PrelPhase"
+    }
 
+    if (u8devstat === 0x00) {
+        devstat = 'ok';
+    }
+    else {
+        devstat = [];
+        for (var i = 7; i >= 3; i--) {
+            if (bitfield(u8devstat, i) === 1) {
+                devstat.push(DevstatDict[i]);
+            }
+        }
+    }
+    return devstat;
+}
+function getDevtype(u16devtype) {
+    var devtype = {};
+
+    var SwPlatformDict = {
+        0: "Error",
+        1: "Platform_21"
+    }
+    var SensorDict = {
+        0: "Error",
+        1: "Vibration",
+        2: "Temperature",
+        3: "Pressure"
+    }
+    var SensorUnitDict = {
+        0: "Error",
+        1: "g",
+        2: "°C",
+        3: "Bar"
+    }
+    var WirelessDict = {
+        0: "Error",
+        1: "BLE",
+        2: "BLE/LoRaWAN",
+    }
+    var OutputDict = {
+        0: "Error",
+        1: "Float",
+        2: "Integer"
+    }
+    devtype.Platform = SwPlatformDict[((u16devtype >> 12) & 0x0F)];
+    devtype.Sensor = SensorDict[((u16devtype >> 8) & 0x0F)];
+    devtype.Wireless = WirelessDict[((u16devtype >> 4) & 0x0F)];
+    devtype.Output = OutputDict[(u16devtype & 0x0F)];
+    devtype.Unit = SensorUnitDict[((u16devtype >> 8) & 0x0F)];
+    return devtype;
+}
 
 
 function round(value, decimal) {
@@ -293,6 +438,13 @@ function arrayConverter(arr, offset, size, lsbfirst = true, isSigned = false) {
         outputval = outputval - Math.pow(2, size * 8);
 
     return outputval;
+}
+function arrayToAscii(arr, offset=0, size = arr.length - offset) {
+    var text =''
+    for (var i = 0; i < size; i++) {
+        text += String.fromCharCode(arr[i + offset]);
+    }
+    return text
 }
 function DecodeFwRevision(decode, port, bytes) {
     if (port == 2) {

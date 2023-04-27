@@ -74,24 +74,35 @@ function Decode8931EX(decode, port, bytes) {
 }
 function Decode8911EX(decode, port, bytes) {
     if (port == 1 || port == 129) {
-        decode.bat = bytes[0] + '%';
-        decode.peak_nb = bytes[1];
-        decode.temp = arrayConverter(bytes, 2, 2);
-        decode.temp = decode.temp == 0x7FFF ? 'err' : round(((decode.temp / 10.0) - 100), 1);
-        decode.sig_rms = round(arrayConverter(bytes, 4, 2) / 1000.0, 3);
-        decode.preset = bytes[6];
-        decode.devstat = {};
-        if (bytes[7] === 0x00) {
-            decode.devstat = 'ok';
+        if (bytes.length >=1) {
+            decode.bat = bytes[0] + '%';
         }
-        else {
-            decode.devstat.rotEn = (bitfield(bytes[7], 7) == 1) ? 'enabled' : 'disabled';
-            decode.devstat.temp = (bitfield(bytes[7], 6) === 0) ? 'ok' : 'err';
-            decode.devstat.acc = (bitfield(bytes[7], 5) === 0) ? 'ok' : 'err';
+        if (bytes.length >= 2) {
+            decode.peak_nb = bytes[1];
         }
-
+        if (bytes.length >= 4) {
+            decode.temp = arrayConverter(bytes, 2, 2);
+            decode.temp = decode.temp == 0x7FFF ? 'err' : round(((decode.temp / 10.0) - 100), 1);
+        }
+        if (bytes.length >= 6) {
+            decode.sig_rms = round(arrayConverter(bytes, 4, 2) / 1000.0, 3);
+        }
+        if (bytes.length >= 7) {
+            decode.preset = bytes[6];
+        }
+        if (bytes.length >= 8) {
+            decode.devstat = {};
+            if (bytes[7] === 0x00) {
+                decode.devstat = 'ok';
+            }
+            else {
+                decode.devstat.rotEn = (bitfield(bytes[7], 7) == 1) ? 'enabled' : 'disabled';
+                decode.devstat.temp = (bitfield(bytes[7], 6) === 0) ? 'ok' : 'err';
+                decode.devstat.acc = (bitfield(bytes[7], 5) === 0) ? 'ok' : 'err';
+            }
+        }
         decode.peaks = [];
-        for (var i = 0; i < decode.peak_nb; i++) {
+        for (var i = 0; i < decode.peak_nb && ((i*5+5) < (bytes.length-8)); i++) {
             var peak = {};
             peak.freq = arrayConverter(bytes, 5 * i + 8, 2);
             peak.mag = round(arrayConverter(bytes, ((i * 5) + 10), 2) / 1000.0, 3);
