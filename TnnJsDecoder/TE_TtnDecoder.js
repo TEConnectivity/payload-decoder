@@ -470,8 +470,9 @@ function DecodeSinglePoint(decode, port, bytes) {
             else {
                 decode.data = (arrayToInt32(bytes, 8, false) / 100.0).toString() + decode.devtype.Unit;
             }
+            return true;
         }
-        return true;
+        
     }
     return false;
 }
