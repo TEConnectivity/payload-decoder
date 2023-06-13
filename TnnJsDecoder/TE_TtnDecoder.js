@@ -9,12 +9,13 @@ function Decoder(bytes, port) {
                     if (Decode8911EXAlgoBatt(decode, port, bytes) === false)
                         if (DecodeU8900Pof(decode, port, bytes) === false)
                             if (DecodeSinglePoint(decode, port, bytes) === false)
-                                if (DecodeOperationResponses(decode, port, bytes) === false)
-                                    if (DecodeKeepAlive(decode, port, bytes) === false) {
-                                        decode.val = 'Unknown frame';
-                                        decode.port = port;
-                                        decode.bytes = bytes.map(byte => byte.toString(16)).join(',');
-                                    }
+                                if (DecodeTiltSensor(decode, port, bytes) === false)
+                                    if (DecodeOperationResponses(decode, port, bytes) === false)
+                                        if (DecodeKeepAlive(decode, port, bytes) === false) {
+                                            decode.val = 'Unknown frame';
+                                            decode.port = port;
+                                            decode.bytes = arrayToString(bytes);
+                                        }
                                   
     return decode;
 
@@ -410,24 +411,66 @@ function DecodeKeepAlive(decode, port, bytes) {
          else {
              return false;
          }
-     }
-function DecodeSinglePoint(decode, port, bytes) {
-    if (port == 10 ) {
-        decode.devtype = {}
-        decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
+}
+function DecodeTiltSensor(decode, port, bytes) {
+    decode.size = bytes.length;
+    if (port == 10)
+        if (0x2411==arrayToUint16(bytes, 0, false) && bytes.length == 24) {
         decode.cnt = arrayToUint16(bytes, 2, false, false);
-        decode.devstat = []
-        decode.devstat = getDevstat(bytes[4])
-        decode.bat = bytes[5];
-
-        decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString() + "°C";
-        if (decode.devtype.Output == "Float") {
-                decode.data = (arrayToFloat(bytes, 8, false)).toString() + decode.devtype.Unit;
-         }
-            else {
-                decode.data = (arrayToInt32(bytes, 8, false) / 100.0).toString() + decode.devtype.Unit;
+        var devstat;
+        devstat = [];
+        var DevstatDict = {
+            7: "Com_Err",
+            6: "Crc_Err",
+            5: "Timeout_Err",
+            4: "Sys_Err",
+            3: "Conf_Err"
         }
 
+        if (bytes[4] === 0x00) {
+            devstat = 'ok';
+        }
+        else {
+
+            for (var i = 7; i >= 3; i--) {
+                if (bitfield(bytes[4], i) === 1) {
+                    devstat.push(DevstatDict[i]);
+                }
+            }
+        }
+        decode.devstat = devstat
+        decode.bat = bytes[5];
+        decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString() + "°C";
+        decode.angleX = (arrayConverter(bytes, 8, 2, false, true) / 100.0).toString() + "°";
+        decode.angleY = (arrayConverter(bytes, 10, 2, false, true) / 100.0).toString() + "°";
+        decode.dispX = (arrayToFloat(bytes, 12, false)).toString() + "mm";
+        decode.dispY = (arrayToFloat(bytes, 16, false)).toString() + "mm";
+        decode.dispZ = (arrayToFloat(bytes, 20, false)).toString() + "mm";
+        return true;
+    }
+    
+
+    return false;
+}
+function DecodeSinglePoint(decode, port, bytes) {
+    if (port == 10 ) {
+               
+        if ([0x1321, 0x1222, 0x1422].includes(arrayToUint16(bytes, 0, false))) {
+            decode.devtype = {}
+            decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
+            decode.cnt = arrayToUint16(bytes, 2, false, false);
+            decode.devstat = []
+            decode.devstat = getDevstat(bytes[4])
+            decode.bat = bytes[5];
+
+            decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString() + "°C";
+            if (decode.devtype.Output == "Float") {
+                decode.data = (arrayToFloat(bytes, 8, false)).toString() + decode.devtype.Unit;
+            }
+            else {
+                decode.data = (arrayToInt32(bytes, 8, false) / 100.0).toString() + decode.devtype.Unit;
+            }
+        }
         return true;
     }
     return false;
