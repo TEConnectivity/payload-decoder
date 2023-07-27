@@ -1,0 +1,148 @@
+
+function Decoder(bytes, port) {
+    var decode = {}
+
+    if (DecodeFwRevision(decode, port, bytes) === false)
+
+            if (Decode8931EX(decode, port, bytes) === false)
+                {
+                                            decode.val = 'Unknown frame';
+                                            decode.port = port;
+                                            decode.bytes = arrayToString(bytes);
+                                        }
+                                  
+    return decode;
+
+}
+function Decode8931EX(decode, port, bytes) {
+    if (port == 5) {
+        decode.bat = (bytes[1] & 0x0F) == 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
+
+        if (bytes[1]&0xF0 === 0x00) {
+            decode.devstat = 'ok';
+        }
+        else {
+            decode.devstat = {};
+            decode.devstat.rotEn = (bitfield(bytes[1], 7) == 1) ? 'enabled' : 'disabled';
+            decode.devstat.temp = (bitfield(bytes[1], 6) === 0) ? 'ok' : 'err';
+            decode.devstat.acc = (bitfield(bytes[1], 5) === 0) ? 'ok' : 'err';
+        }
+        decode.presetId = bytes[0];
+        decode.temp = bytes[2] * 0.5 - 40 + '°C';
+        decode.fftInfo = {};
+        decode.fftInfo.BwMode = bytes[3] & 0x0F;
+        decode.axisInfo = {};
+        decode.axisInfo.Axis = String.fromCharCode(88 + (bytes[4] >> 6));
+        decode.axisInfo.PeakNb = bytes[4] & 0x3F;
+        decode.axisInfo.SigRms = dBDecompression(bytes[5]);
+
+        decode.peaksList = [];
+
+
+
+        var peakVal = 0;
+        var bitCount = 0;
+        for (var i = 0; i < decode.axisInfo.PeakNb * 19; i++) {
+            peakVal |= ((bytes[6 + Math.trunc((i / 8))] >> (8 - 1 - (i % 8))) & 0x01) << (19 - bitCount - 1);
+            bitCount++;
+            if (bitCount == 19) {
+
+                var peak = {};
+                peak.Freq = peakVal >> 8;
+                peak.Mag = dBDecompression(peakVal & 0xFF);
+                decode.peaksList.push(peak);
+                bitCount = 0;
+                peakVal = 0;
+            }
+
+
+
+        }
+        return true;
+
+    }
+
+
+    else {
+        return false;
+    }
+}
+function DecodeFwRevision(decode, port, bytes) {
+    if (port == 2) {      
+        decode.firmware_version = arrayToAscii(bytes);
+        return true;
+    }
+    return false;
+}
+ 
+function arrayToString(arr, offset = 0, size = arr.length - offset) {
+    var text = ''
+    text = arr.slice(offset, offset+size).map(byte => byte.toString(16)).join(',');
+
+    return text
+}
+function arrayToAscii(arr, offset=0, size = arr.length - offset) {
+    var text = ''
+    for (var i = 0; i < size; i++) {
+        text += String.fromCharCode(arr[i + offset]);
+    }
+    return text
+}
+function round(value, decimal) {
+    return Math.round(value * Math.pow(10, decimal)) / Math.pow(10, decimal);
+
+}
+function hexToFloat(hex) {
+    var s = hex >> 31 ? -1 : 1;
+    var e = (hex >> 23) & 0xFF;
+    return s * (hex & 0x7fffff | 0x800000) * 1.0 / Math.pow(2, 23) * Math.pow(2, (e - 127))
+}
+function arrayToUint32(arr, offset, littleEndian = true) {
+    return (arrayConverter(arr, offset, 4, littleEndian, false));
+}
+function arrayToUint16(arr, offset, littleEndian = true) {
+    return (arrayConverter(arr, offset, 2, littleEndian,false));
+}
+function arrayToInt32(arr, offset, littleEndian = true) {
+    return (arrayConverter(arr, offset, 4, littleEndian, true));
+}
+function arrayToInt16(arr, offset, littleEndian = true) {
+    return (arrayConverter(arr, offset, 2, littleEndian, true));
+}
+function arrayToFloatOld(arr, offset, littleEndian = true) {
+    return hexToFloat(arrayConverter(arr, offset, 4, littleEndian,false));
+}
+
+function arrayToFloat(arr, offset, littleEndian = true) {
+    let view = new DataView(new ArrayBuffer(4));
+    for (let i = 0; i < 4; i++) {
+        view.setUint8(i, arr[i + offset]);
+    }
+    return view.getFloat32(0, littleEndian);
+}
+
+
+function arrayConverter(arr, offset, size, littleEndian = true, isSigned = false) {
+    var outputval = 0;
+    for (var i = 0; i < size; i++) {
+        if (littleEndian == false) {
+            outputval |= arr[offset + size - i - 1] << (i * 8);
+        }
+        else {
+            outputval |= arr[i + offset] << (i * 8);
+        }
+    }
+    if (isSigned && (Math.pow(2, (size) * 8 - 1) < outputval))
+        outputval = outputval - Math.pow(2, size * 8);
+
+    return outputval;
+}
+
+function bitfield(val, offset) {
+    return (val >> offset) & 0x01;
+}
+
+function dBDecompression(val) {
+    return Math.pow(10, ((val * 0.3149606) - 49.0298) / 20);
+}
+

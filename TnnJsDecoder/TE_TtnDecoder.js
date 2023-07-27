@@ -413,7 +413,6 @@ function DecodeKeepAlive(decode, port, bytes) {
          }
 }
 function DecodeTiltSensor(decode, port, bytes) {
-    decode.size = bytes.length;
     if (port == 10)
         if (0x2411==arrayToUint16(bytes, 0, false) && bytes.length == 24) {
         decode.cnt = arrayToUint16(bytes, 2, false, false);
@@ -484,7 +483,10 @@ function getDevstat(u8devstat) {
         6: "CfgErr",
         5: "MiscErr",
         4: "Condition",
-        3: "PrelPhase"
+        3: "PrelPhase",
+        2: "Reserved",
+        1: "Reserved",
+        0: "BattErr"
     }
 
     if (u8devstat === 0x00) {
@@ -492,7 +494,7 @@ function getDevstat(u8devstat) {
     }
     else {
        
-        for (var i = 7; i >= 3; i--) {
+        for (var i = 7; i >= 0; i--) {
             if (bitfield(u8devstat, i) === 1) {
                 devstat.push(DevstatDict[i]);
             }

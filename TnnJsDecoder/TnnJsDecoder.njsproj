@@ -31,6 +31,7 @@
     <Content Include="app.js" />
     <Content Include="package.json" />
     <Content Include="README.md" />
+    <Content Include="8931N TTN decoder.txt" />
     <Content Include="TE_TtnDecoder.js">
       <SubType>Code</SubType>
     </Content>
