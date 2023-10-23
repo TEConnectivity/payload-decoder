@@ -513,13 +513,15 @@ function getDevtype(u16devtype) {
         0: "Error",
         1: "Vibration",
         2: "Temperature",
-        3: "Pressure"
+        3: "Pressure",
+        4: "Humidity"
     }
     var SensorUnitDict = {
         0: "Error",
         1: "g",
         2: "°C",
-        3: "Bar"
+        3: "Bar",
+        3: "%"
     }
     var WirelessDict = {
         0: "Error",
