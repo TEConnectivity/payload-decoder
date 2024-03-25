@@ -1,12 +1,32 @@
+function decodeUplink(input) {
+    // input has the following structure:
+    // {
+    //   "bytes": [1, 2, 3], // FRMPayload (byte array)
+    //   "fPort": 1
+    // }
 
-function Decoder(bytes, port) {
-    var decode = {}
+
+    // Should RETURN :
+    //
+    // data: {
+    //     bytes: input.bytes,
+    //   },
+    //   warnings: ["warning 1", "warning 2"], // optional
+    //   errors: ["error 1", "error 2"], // optional (if set, the decoding failed)
+    // };
+    
+    return te_decoder(input.bytes, input.fPort)
+  }
+
+
+function te_decoder(bytes, port) {
+    var ttn_output = {data:{}}
+    var decode = ttn_output.data
 
     if (DecodeFwRevision(decode, port, bytes) === false)
         if (Decode8911EX(decode, port, bytes) === false)
             if (Decode8931EX(decode, port, bytes) === false)
                 if (DecodeU8900(decode, port, bytes) === false)
-                    if (Decode8911EXAlgoBatt(decode, port, bytes) === false)
                         if (DecodeU8900Pof(decode, port, bytes) === false)
                             if (DecodeSinglePoint(decode, port, bytes) === false)
                                 if (DecodeTiltSensor(decode, port, bytes) === false)
@@ -17,24 +37,22 @@ function Decoder(bytes, port) {
                                             decode.bytes = arrayToString(bytes);
                                         }
                                   
-    return decode;
+    return ttn_output;
 
 }
+
 function Decode8931EX(decode, port, bytes) {
     if (port == 5) {
         decode.bat = (bytes[1] & 0x0F) == 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
 
-        if (bytes[1]&0xF0 === 0x00) {
-            decode.devstat = 'ok';
-        }
-        else {
-            decode.devstat = {};
-            decode.devstat.rotEn = (bitfield(bytes[1], 7) == 1) ? 'enabled' : 'disabled';
-            decode.devstat.temp = (bitfield(bytes[1], 6) === 0) ? 'ok' : 'err';
-            decode.devstat.acc = (bitfield(bytes[1], 5) === 0) ? 'ok' : 'err';
-        }
+        decode.devstat = {};
+        decode.devstat.rotEn = (bitfield(bytes[1], 7) == 1) ? 'enabled' : 'disabled';
+        decode.devstat.temp = (bitfield(bytes[1], 6) === 0) ? 'ok' : 'err';
+        decode.devstat.acc = (bitfield(bytes[1], 5) === 0) ? 'ok' : 'err';
+        
+
         decode.presetId = bytes[0];
-        decode.temp = bytes[2] * 0.5 - 40 + '캜';
+        decode.temp = bytes[2] * 0.5 - 40 + '째C';
         decode.fftInfo = {};
         decode.fftInfo.BwMode = bytes[3] & 0x0F;
         decode.axisInfo = {};
@@ -69,12 +87,20 @@ function Decode8931EX(decode, port, bytes) {
     }
 
 
+    else if (port == 133 || port == 197){
+        // 133 start fragment, 197 end fragment
+        decode.val = '8931 : Fragmented frame NOT SUPPORTED by TTN Live Decoder';
+        decode.port = port;
+        decode.bytes = arrayToString(bytes);  
+        return true;
+    }
     else {
         return false;
     }
 }
+
 function Decode8911EX(decode, port, bytes) {
-    if (port == 1 || port == 129) {
+    if (port == 1) {
         if (bytes.length >=1) {
             decode.bat = bytes[0] + '%';
         }
@@ -93,14 +119,11 @@ function Decode8911EX(decode, port, bytes) {
         }
         if (bytes.length >= 8) {
             decode.devstat = {};
-            if (bytes[7] === 0x00) {
-                decode.devstat = 'ok';
-            }
-            else {
-                decode.devstat.rotEn = (bitfield(bytes[7], 7) == 1) ? 'enabled' : 'disabled';
-                decode.devstat.temp = (bitfield(bytes[7], 6) === 0) ? 'ok' : 'err';
-                decode.devstat.acc = (bitfield(bytes[7], 5) === 0) ? 'ok' : 'err';
-            }
+            decode.devstat.acc = (bitfield(bytes[7], 5) === 0) ? 'ok' : 'err';
+            decode.devstat.temp = (bitfield(bytes[7], 6) === 0) ? 'ok' : 'err';
+            decode.devstat.rotEn = (bitfield(bytes[7], 7) == 1) ? 'enabled' : 'disabled';
+            decode.devstat.com = (bitfield(bytes[7], 3) == 0) ? 'ok' : 'err';
+            decode.devstat.battery = (bitfield(bytes[7], 0) == 0) ? 'ok' : 'err';
         }
         decode.peaks = [];
         for (var i = 0; i < decode.peak_nb && ((i*5+5) < (bytes.length-8)); i++) {
@@ -112,8 +135,16 @@ function Decode8911EX(decode, port, bytes) {
 
         } return true;
     }
+    else if(port == 129 || port == 193) {
+        // 129 start fragment, 193 end fragment
+        decode.val = '8911 : Fragmented frame NOT SUPPORTED by TTN Live Decoder';
+        decode.port = port;
+        decode.bytes = arrayToString(bytes);
+        return true;
+    }
     return false;
 }
+
 function DecodeFwRevision(decode, port, bytes) {
     if (port == 2) {      
         decode.firmware_version = arrayToAscii(bytes);
@@ -137,21 +168,13 @@ function DecodeU8900(decode, port, bytes) {
             decode.devstat.Unsup = (bitfield(bytes[0], 4) === 0) ? 'ok' : 'err';
 
         }
-        decode.temp = isNaN(arrayToFloat(bytes, 2)) ? 'err' : round(arrayToFloat(bytes, 2), 1) + '캜';
+        decode.temp = isNaN(arrayToFloat(bytes, 2)) ? 'err' : round(arrayToFloat(bytes, 2), 1) + '째C';
         decode.pres = isNaN(arrayToFloat(bytes, 6)) ? 'err' : round(arrayToFloat(bytes, 6), 3) + 'Bar';
         return true;
     }
     return false;
 }
-function Decode8911EXAlgoBatt(decode, port, bytes) {
-    if (port == 101) {
-        decode.test = 'Battery algo';
-        decode.batt = bytes[0] + '%';
-        decode.capacity = arrayToFloat(bytes, 2);
-        return true;
-    }
-    return false;
-}
+
 function DecodeU8900Pof(decode, port, bytes) {
     if (port == 104) {
         // MCU Flags
@@ -180,7 +203,7 @@ function DecodeU8900Pof(decode, port, bytes) {
         decode.patbatt = bytes[9] == 0xA5 ? 'OK' : 'Corrupted';
         decode.pattemp = bytes[9] == 0xA5 ? 'OK' : 'Corrupted';
 
-        decode.mcu_temp = arrayConverter(bytes, 10, 2, true, true) / 100.0 + '캜';
+        decode.mcu_temp = arrayConverter(bytes, 10, 2, true, true) / 100.0 + '째C';
         decode.pres = isNaN(arrayToFloat(bytes, 13)) ? 'ERROR' : round(arrayToFloat(bytes, 13), 3) + ' Bar';
         decode.patend = bytes[17] == 0x5A ? 'OK' : 'KO !!! ';
         var i = 0;
@@ -413,6 +436,7 @@ function DecodeKeepAlive(decode, port, bytes) {
          }
 }
 function DecodeTiltSensor(decode, port, bytes) {
+    decode.size = bytes.length;
     if (port == 10)
         if (0x2411==arrayToUint16(bytes, 0, false) && bytes.length == 24) {
         decode.cnt = arrayToUint16(bytes, 2, false, false);
@@ -439,9 +463,9 @@ function DecodeTiltSensor(decode, port, bytes) {
         }
         decode.devstat = devstat
         decode.bat = bytes[5];
-        decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString() + "캜";
-        decode.angleX = (arrayConverter(bytes, 8, 2, false, true) / 100.0).toString() + "�";
-        decode.angleY = (arrayConverter(bytes, 10, 2, false, true) / 100.0).toString() + "�";
+        decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString() + "째C";
+        decode.angleX = (arrayConverter(bytes, 8, 2, false, true) / 100.0).toString() + "째";
+        decode.angleY = (arrayConverter(bytes, 10, 2, false, true) / 100.0).toString() + "째";
         decode.dispX = (arrayToFloat(bytes, 12, false)).toString() + "mm";
         decode.dispY = (arrayToFloat(bytes, 16, false)).toString() + "mm";
         decode.dispZ = (arrayToFloat(bytes, 20, false)).toString() + "mm";
@@ -454,6 +478,9 @@ function DecodeTiltSensor(decode, port, bytes) {
 function DecodeSinglePoint(decode, port, bytes) {
     if (port == 10 ) {
                
+
+        // 0x1321, 0x1222, 0x1422 map to devtype for pressure and temperature and humidity sensors...
+        // Should not be mandatory if fport10 is always used for singlepoint
         if ([0x1321, 0x1222, 0x1422].includes(arrayToUint16(bytes, 0, false))) {
             decode.devtype = {}
             decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
@@ -462,12 +489,12 @@ function DecodeSinglePoint(decode, port, bytes) {
             decode.devstat = getDevstat(bytes[4])
             decode.bat = bytes[5];
 
-            decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString() + "캜";
+            decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString();
             if (decode.devtype.Output == "Float") {
-                decode.data = (arrayToFloat(bytes, 8, false)).toString() + decode.devtype.Unit;
+                decode.data = (arrayToFloat(bytes, 8, false)).toString();
             }
             else {
-                decode.data = (arrayToInt32(bytes, 8, false) / 100.0).toString() + decode.devtype.Unit;
+                decode.data = (arrayToInt32(bytes, 8, false) / 100.0).toString();
             }
             return true;
         }
@@ -519,9 +546,9 @@ function getDevtype(u16devtype) {
     var SensorUnitDict = {
         0: "Error",
         1: "g",
-        2: "캜",
+        2: "째C",
         3: "Bar",
-        3: "%"
+        4: "%"
     }
     var WirelessDict = {
         0: "Error",
@@ -588,6 +615,8 @@ function arrayToFloat(arr, offset, littleEndian = true) {
 
 
 function arrayConverter(arr, offset, size, littleEndian = true, isSigned = false) {
+    // Concatenate bytes from arr[offset] to arr[offset+size] and return the value as decimal. 
+    // The reading sense depends on endianess, by default littleEndian (from right to left)
     var outputval = 0;
     for (var i = 0; i < size; i++) {
         if (littleEndian == false) {
@@ -610,4 +639,3 @@ function bitfield(val, offset) {
 function dBDecompression(val) {
     return Math.pow(10, ((val * 0.3149606) - 49.0298) / 20);
 }
-
