@@ -1,9 +1,12 @@
-﻿################################################################################
-# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
-################################################################################
+﻿.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
 
-/.vs/TnnJsDecoder/FileContentIndex
-/.vs
-/TnnJsDecoder/obj
-/TnnJsDecoder/bin/Microsoft.NodejsTools.WebRole.dll
-/TnnJsDecoder/bin
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix

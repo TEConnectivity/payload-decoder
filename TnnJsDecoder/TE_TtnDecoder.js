@@ -14,29 +14,32 @@ function decodeUplink(input) {
     //   warnings: ["warning 1", "warning 2"], // optional
     //   errors: ["error 1", "error 2"], // optional (if set, the decoding failed)
     // };
-    
+
     return te_decoder(input.bytes, input.fPort)
-  }
+}
 
 
 function te_decoder(bytes, port) {
-    var ttn_output = {data:{}}
+    var ttn_output = { data: {} }
     var decode = ttn_output.data
+
+
+    console.log(bytes)
 
     if (DecodeFwRevision(decode, port, bytes) === false)
         if (Decode8911EX(decode, port, bytes) === false)
             if (Decode8931EX(decode, port, bytes) === false)
                 if (DecodeU8900(decode, port, bytes) === false)
-                        if (DecodeU8900Pof(decode, port, bytes) === false)
-                            if (DecodeSinglePoint(decode, port, bytes) === false)
-                                if (DecodeTiltSensor(decode, port, bytes) === false)
-                                    if (DecodeOperationResponses(decode, port, bytes) === false)
-                                        if (DecodeKeepAlive(decode, port, bytes) === false) {
-                                            decode.val = 'Unknown frame';
-                                            decode.port = port;
-                                            decode.bytes = arrayToString(bytes);
-                                        }
-                                  
+                    if (DecodeU8900Pof(decode, port, bytes) === false)
+                        if (DecodeSinglePointOrMultiPoint(decode, port, bytes) === false)
+                            if (DecodeTiltSensor(decode, port, bytes) === false)
+                                if (DecodeOperationResponses(decode, port, bytes) === false)
+                                    if (DecodeKeepAlive(decode, port, bytes) === false) {
+                                        decode.val = 'Unknown frame';
+                                        decode.port = port;
+                                        decode.bytes = arrayToString(bytes);
+                                    }
+
     return ttn_output;
 
 }
@@ -49,7 +52,7 @@ function Decode8931EX(decode, port, bytes) {
         decode.devstat.rotEn = (bitfield(bytes[1], 7) == 1) ? 'enabled' : 'disabled';
         decode.devstat.temp = (bitfield(bytes[1], 6) === 0) ? 'ok' : 'err';
         decode.devstat.acc = (bitfield(bytes[1], 5) === 0) ? 'ok' : 'err';
-        
+
 
         decode.presetId = bytes[0];
         decode.temp = bytes[2] * 0.5 - 40 + '°C';
@@ -87,11 +90,11 @@ function Decode8931EX(decode, port, bytes) {
     }
 
 
-    else if (port == 133 || port == 197){
+    else if (port == 133 || port == 197) {
         // 133 start fragment, 197 end fragment
         decode.val = '8931 : Fragmented frame NOT SUPPORTED by TTN Live Decoder';
         decode.port = port;
-        decode.bytes = arrayToString(bytes);  
+        decode.bytes = arrayToString(bytes);
         return true;
     }
     else {
@@ -101,7 +104,7 @@ function Decode8931EX(decode, port, bytes) {
 
 function Decode8911EX(decode, port, bytes) {
     if (port == 1) {
-        if (bytes.length >=1) {
+        if (bytes.length >= 1) {
             decode.bat = bytes[0] + '%';
         }
         if (bytes.length >= 2) {
@@ -126,7 +129,7 @@ function Decode8911EX(decode, port, bytes) {
             decode.devstat.battery = (bitfield(bytes[7], 0) == 0) ? 'ok' : 'err';
         }
         decode.peaks = [];
-        for (var i = 0; i < decode.peak_nb && ((i*5+5) < (bytes.length-8)); i++) {
+        for (var i = 0; i < decode.peak_nb && ((i * 5 + 5) < (bytes.length - 8)); i++) {
             var peak = {};
             peak.freq = arrayConverter(bytes, 5 * i + 8, 2);
             peak.mag = round(arrayConverter(bytes, ((i * 5) + 10), 2) / 1000.0, 3);
@@ -135,7 +138,7 @@ function Decode8911EX(decode, port, bytes) {
 
         } return true;
     }
-    else if(port == 129 || port == 193) {
+    else if (port == 129 || port == 193) {
         // 129 start fragment, 193 end fragment
         decode.val = '8911 : Fragmented frame NOT SUPPORTED by TTN Live Decoder';
         decode.port = port;
@@ -146,7 +149,7 @@ function Decode8911EX(decode, port, bytes) {
 }
 
 function DecodeFwRevision(decode, port, bytes) {
-    if (port == 2) {      
+    if (port == 2) {
         decode.firmware_version = arrayToAscii(bytes);
         return true;
     }
@@ -214,273 +217,272 @@ function DecodeU8900Pof(decode, port, bytes) {
         return true;
     }
     return false;
-     }
-     //port 10  EyEALQhjCgw/gHNj  1321002d08630a0c3f807363    data
-     //port 20  AComZGU4ZWFiMTdhZDVm  00 2a 26 64 65 38 65 61 62 31 37 61 64 35 66 fw rev
-    //port 30  /EyEARwhj keep alive 132100470863
+}
+//port 10  EyEALQhjCgw/gHNj  1321002d08630a0c3f807363    data
+//port 20  AComZGU4ZWFiMTdhZDVm  00 2a 26 64 65 38 65 61 62 31 37 61 64 35 66 fw rev
+//port 30  /EyEARwhj keep alive 132100470863
 function DecodeOperationResponses(decode, port, bytes) {
-         var res = false;
-         if (port == 20) {
-             res = true;
-             var OperationRepsType = {
-                 0: "Read",
-                 1: "Write",
-                 2: "Write+Read"
-             }
-             var OperationFlag = {
-                 7: "UuidUnk",
-                 6: "OpErr",
-                 5: "ReadOnly",
-                 4: "NetwErr",
+    var res = false;
+    if (port == 20) {
+        res = true;
+        var OperationRepsType = {
+            0: "Read",
+            1: "Write",
+            2: "Write+Read"
+        }
+        var OperationFlag = {
+            7: "UuidUnk",
+            6: "OpErr",
+            5: "ReadOnly",
+            4: "NetwErr",
 
-             }
-             decode.op = OperationRepsType[bytes[0]&0x3];
-             decode.opFlag = [];
-             for (var i = 7; i > 4; i--) {
-                 if (bitfield(bytes[0], i) === 1) {
-                     decode.opFlag.push(OperationFlag[i]);
-                 }
-             }
-                 var uuid = arrayToUint16(bytes, 1, false)
-                 decode.uuid = uuid.toString(16);
-                 var payload = bytes.slice(3)
-                 switch (uuid) {
-                     case 0x2A24:
-                         decode.model = arrayToAscii(payload);
-                         break;
-                     case 0x2A25:
-                         decode.sn = arrayToAscii(payload);
-                         break;
-                     case 0x2A26:
-                         decode.fwrev = arrayToAscii(payload);
-                         break;
-                     case 0x2A27:
-                         decode.hwrev = arrayToAscii(payload);
-                         break;
-                     case 0x2A29:
-                         decode.manuf = arrayToAscii(payload);
-                         break;
-                     case 0xB302:
-                         decode.measInt = payload[0].toString() + 'h '+payload[1].toString() + ' min'+payload[2].toString() + ' sec';
-                         break;
-                     case 0x2A19:
-                         decode.batt = payload[0];
-                         break;
-                     case 0xCE01:
-                         var KeepAliveInterval = {
-                             0: "24h",
-                             1: "12h",
-                             2: "8h",
-                             3: "4h",
-                             4: "2h"
-                         }
-                         var KeepAliveMode = {
-                             0: "AnyTime",
-                             1: "IfSilent",
-                             2: "Disable"
-                         }
-                         decode.kaCfg = {};
-                         decode.kaCfg.mode = KeepAliveMode[(payload[0]>>3) & 0x3];
-                         decode.kaCfg.interval = KeepAliveInterval[payload[0] & 0x7];
-                         break;
-                     case 0xB201:
-                         var ThsSrc = {
-                             0: "MainRaw",
-                             1: "MainDelta",
-                             2: "SecondaryRaw",
-                             3: "SecondaryDelta",
-                             0xFF:"Error"
-                         }
-                         var ThsSel = {
-                             0: "Config",
-                             1: "Level",
-                             2: "MeasInterval",
-                             3: "ComMode",
-                             0xFF: "Error"
-                         }
-                         decode.ThsCfg = {};
-                         decode.ThsCfg.Src = ThsSrc[payload[0]];
-                         decode.ThsCfg.Sel = ThsSel[payload[1]];
-                         switch (decode.ThsCfg.Sel) {
-                             case "Config":
-                                 decode.ThsCfg.cfg = {};
-                                 decode.ThsCfg.cfg.eventFlag = bitfield(payload[2], 7);
-                                 decode.ThsCfg.cfg.enable = bitfield(payload[2], 6);
-                                 decode.ThsCfg.cfg.condition =( bitfield(payload[2], 5) == 1 )? '<' : '>';
-                                 decode.ThsCfg.cfg.autoclr = bitfield(payload[2], 4);
-                                 decode.ThsCfg.cfg.actionMeasIntEn = bitfield(payload[2], 3) 
-                                 decode.ThsCfg.cfg.actionAdvModeEn = bitfield(payload[2], 2) 
-                                 decode.ThsCfg.cfg.actionUplModeEn = bitfield(payload[2], 1) 
-                                 break;
-                             case "Level":
-                                 decode.ThsCfg.lvl = {};
-                                 if (payload.length - 2 >= 4) {
-                                     decode.ThsCfg.lvl.valf32 = arrayToFloat(payload, 2, false);
-                                     decode.ThsCfg.lvl.vali32 = arrayToInt32(payload, 2, false) / 100.0;
+        }
+        decode.op = OperationRepsType[bytes[0] & 0x3];
+        decode.opFlag = [];
+        for (var i = 7; i > 4; i--) {
+            if (bitfield(bytes[0], i) === 1) {
+                decode.opFlag.push(OperationFlag[i]);
+            }
+        }
+        var uuid = arrayToUint16(bytes, 1, false)
+        decode.uuid = uuid.toString(16);
+        var payload = bytes.slice(3)
+        switch (uuid) {
+            case 0x2A24:
+                decode.model = arrayToAscii(payload);
+                break;
+            case 0x2A25:
+                decode.sn = arrayToAscii(payload);
+                break;
+            case 0x2A26:
+                decode.fwrev = arrayToAscii(payload);
+                break;
+            case 0x2A27:
+                decode.hwrev = arrayToAscii(payload);
+                break;
+            case 0x2A29:
+                decode.manuf = arrayToAscii(payload);
+                break;
+            case 0xB302:
+                decode.measInt = payload[0].toString() + 'h ' + payload[1].toString() + ' min' + payload[2].toString() + ' sec';
+                break;
+            case 0x2A19:
+                decode.batt = payload[0];
+                break;
+            case 0xCE01:
+                var KeepAliveInterval = {
+                    0: "24h",
+                    1: "12h",
+                    2: "8h",
+                    3: "4h",
+                    4: "2h"
+                }
+                var KeepAliveMode = {
+                    0: "AnyTime",
+                    1: "IfSilent",
+                    2: "Disable"
+                }
+                decode.kaCfg = {};
+                decode.kaCfg.mode = KeepAliveMode[(payload[0] >> 3) & 0x3];
+                decode.kaCfg.interval = KeepAliveInterval[payload[0] & 0x7];
+                break;
+            case 0xB201:
+                var ThsSrc = {
+                    0: "MainRaw",
+                    1: "MainDelta",
+                    2: "SecondaryRaw",
+                    3: "SecondaryDelta",
+                    0xFF: "Error"
+                }
+                var ThsSel = {
+                    0: "Config",
+                    1: "Level",
+                    2: "MeasInterval",
+                    3: "ComMode",
+                    0xFF: "Error"
+                }
+                decode.ThsCfg = {};
+                decode.ThsCfg.Src = ThsSrc[payload[0]];
+                decode.ThsCfg.Sel = ThsSel[payload[1]];
+                switch (decode.ThsCfg.Sel) {
+                    case "Config":
+                        decode.ThsCfg.cfg = {};
+                        decode.ThsCfg.cfg.eventFlag = bitfield(payload[2], 7);
+                        decode.ThsCfg.cfg.enable = bitfield(payload[2], 6);
+                        decode.ThsCfg.cfg.condition = (bitfield(payload[2], 5) == 1) ? '<' : '>';
+                        decode.ThsCfg.cfg.autoclr = bitfield(payload[2], 4);
+                        decode.ThsCfg.cfg.actionMeasIntEn = bitfield(payload[2], 3)
+                        decode.ThsCfg.cfg.actionAdvModeEn = bitfield(payload[2], 2)
+                        decode.ThsCfg.cfg.actionUplModeEn = bitfield(payload[2], 1)
+                        break;
+                    case "Level":
+                        decode.ThsCfg.lvl = {};
+                        if (payload.length - 2 >= 4) {
+                            decode.ThsCfg.lvl.valf32 = arrayToFloat(payload, 2, false);
+                            decode.ThsCfg.lvl.vali32 = arrayToInt32(payload, 2, false) / 100.0;
 
-                                     decode.ThsCfg.lvl.vali16 = arrayToInt16(payload, 4, false) / 100.0;
-                                 }
-                                 else {
-                                     decode.ThsCfg.lvl.err = "wrong size";
-                                 }
-                                 break;
-                             case "MeasInterval":
-                                 decode.ThsCfg.measInt = payload[2].toString() + 'h ' + payload[3].toString() + ' min' + payload[4].toString() + ' sec';
-                                 break;
-                             case "ComMode":
-                                 var ThsComBleMode = {
-                                     0: "Periodic",
-                                     1: "On Measure",
-                                     2: "ADV Silent"
-                                 }
-                                 var ThsComLoraMode = {
-                                     0: "On Measurement",
-                                     1: "Silent",
-                                     2: "Merge"
-                                 }
-                                 decode.ThsCfg.ComMode = {};
-                                 decode.ThsCfg.ComMode.ble = ThsComBleMode[payload[2]&0x03];
-                                 decode.ThsCfg.ComMode.lora = ThsComLoraMode[payload[3]&0x03];
-                                 break;
-                         }
-                         break;
-                     case 0xDB01:
-                         var DataLogDataType = {
-                             0: "Temperature",
-                             1: "MainData",
-                             2: "Temperature+MainData"
-                         }
-                         var DataLogDataSize = {
-                             0: 2,
-                             1: 4,
-                             2: 6,
-                         }
-                         decode.Datalog = {};
-                         decode.Datalog.type = DataLogDataType[payload[0]];
-                         decode.Datalog.index = arrayToUint16(payload, 1, false);
-                         decode.Datalog.length = payload[3];
-                         var dataSize = DataLogDataSize[payload[0]];
-                         decode.Datalog.data = [];
-                         for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize*(i+1)+4) ; i++) {
-                             var dataN = {};
-                             dataN.index = decode.Datalog.index + i;
-                             switch (decode.Datalog.type) {
-                                 case "Temperature":
-                                     dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false)/100.0;
-                                     break;
-                                 case "MainData":
-                                     dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4, false)/100.0;
-                                     dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4, false);
-                                     break;
-                                 case "Temperature+MainData":
-                                     dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
-                                     dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4 + 2, false) / 100.0;
-                                     dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4+2, false);
-                                     break;
-                                 default: break;
-                             }
-                             decode.Datalog.data.push(dataN);
-                         }
-                         break;
-                     case 0xF801:
-                         decode.DevEui = arrayToString(payload);
-                         break;
-                     case 0xF802:
-                         decode.AppEui = arrayToString(payload);
-                         break;
-                     case 0xF803:
-                         var RegionType = {
-                             0: "AS923",
-                             1: "AU915",
-                             2: "CN470",
-                             3: "CN779",
-                             4: "EU433",
-                             5: "EU868",
-                             6: "KR920",
-                             7: "IN865",
-                             8: "US915"
-                         }
-                         decode.Region = RegionType[payload[0]&0x0F];
-                         break;
-                     case 0xF804:
-                         decode.netId = arrayToString(payload);
-                         break;
-                     default:
-                         decode.payload = []
-                         decode.payload = arrayToString(payload);
-                         
-                         break;
-                 }
+                            decode.ThsCfg.lvl.vali16 = arrayToInt16(payload, 4, false) / 100.0;
+                        }
+                        else {
+                            decode.ThsCfg.lvl.err = "wrong size";
+                        }
+                        break;
+                    case "MeasInterval":
+                        decode.ThsCfg.measInt = payload[2].toString() + 'h ' + payload[3].toString() + ' min' + payload[4].toString() + ' sec';
+                        break;
+                    case "ComMode":
+                        var ThsComBleMode = {
+                            0: "Periodic",
+                            1: "On Measure",
+                            2: "ADV Silent"
+                        }
+                        var ThsComLoraMode = {
+                            0: "On Measurement",
+                            1: "Silent",
+                            2: "Merge"
+                        }
+                        decode.ThsCfg.ComMode = {};
+                        decode.ThsCfg.ComMode.ble = ThsComBleMode[payload[2] & 0x03];
+                        decode.ThsCfg.ComMode.lora = ThsComLoraMode[payload[3] & 0x03];
+                        break;
+                }
+                break;
+            case 0xDB01:
+                var DataLogDataType = {
+                    0: "Temperature",
+                    1: "MainData",
+                    2: "Temperature+MainData"
+                }
+                var DataLogDataSize = {
+                    0: 2,
+                    1: 4,
+                    2: 6,
+                }
+                decode.Datalog = {};
+                decode.Datalog.type = DataLogDataType[payload[0]];
+                decode.Datalog.index = arrayToUint16(payload, 1, false);
+                decode.Datalog.length = payload[3];
+                var dataSize = DataLogDataSize[payload[0]];
+                decode.Datalog.data = [];
+                for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize * (i + 1) + 4); i++) {
+                    var dataN = {};
+                    dataN.index = decode.Datalog.index + i;
+                    switch (decode.Datalog.type) {
+                        case "Temperature":
+                            dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
+                            break;
+                        case "MainData":
+                            dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4, false) / 100.0;
+                            dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4, false);
+                            break;
+                        case "Temperature+MainData":
+                            dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
+                            dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4 + 2, false) / 100.0;
+                            dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4 + 2, false);
+                            break;
+                        default: break;
+                    }
+                    decode.Datalog.data.push(dataN);
+                }
+                break;
+            case 0xF801:
+                decode.DevEui = arrayToString(payload);
+                break;
+            case 0xF802:
+                decode.AppEui = arrayToString(payload);
+                break;
+            case 0xF803:
+                var RegionType = {
+                    0: "AS923",
+                    1: "AU915",
+                    2: "CN470",
+                    3: "CN779",
+                    4: "EU433",
+                    5: "EU868",
+                    6: "KR920",
+                    7: "IN865",
+                    8: "US915"
+                }
+                decode.Region = RegionType[payload[0] & 0x0F];
+                break;
+            case 0xF804:
+                decode.netId = arrayToString(payload);
+                break;
+            default:
+                decode.payload = []
+                decode.payload = arrayToString(payload);
 
-             
-         }
-         else {
-             res = false;
-         }
-         return res;
-     }
+                break;
+        }
+
+
+    }
+    else {
+        res = false;
+    }
+    return res;
+}
 function DecodeKeepAlive(decode, port, bytes) {
-         if (port == 30) {
-             decode.msgType = "Keep Alive";
-             decode.devtype = {}
-             decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
-             decode.cnt = arrayToUint16(bytes, 2, false, false);
-             decode.devstat = []
-             decode.devstat = getDevstat(bytes[4])
-             decode.bat = bytes[5];
-            
-             return true;
-         }
-         else {
-             return false;
-         }
+    if (port == 30) {
+        decode.msgType = "Keep Alive";
+        decode.devtype = {}
+        decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
+        decode.cnt = arrayToUint16(bytes, 2, false, false);
+        decode.devstat = []
+        decode.devstat = getDevstat(bytes[4])
+        decode.bat = bytes[5];
+
+        return true;
+    }
+    else {
+        return false;
+    }
 }
 function DecodeTiltSensor(decode, port, bytes) {
     decode.size = bytes.length;
     if (port == 10)
-        if (0x2411==arrayToUint16(bytes, 0, false) && bytes.length == 24) {
-        decode.cnt = arrayToUint16(bytes, 2, false, false);
-        var devstat;
-        devstat = [];
-        var DevstatDict = {
-            7: "Com_Err",
-            6: "Crc_Err",
-            5: "Timeout_Err",
-            4: "Sys_Err",
-            3: "Conf_Err"
-        }
+        if (0x2411 == arrayToUint16(bytes, 0, false) && bytes.length == 24) {
+            decode.cnt = arrayToUint16(bytes, 2, false, false);
+            var devstat;
+            devstat = [];
+            var DevstatDict = {
+                7: "Com_Err",
+                6: "Crc_Err",
+                5: "Timeout_Err",
+                4: "Sys_Err",
+                3: "Conf_Err"
+            }
 
-        if (bytes[4] === 0x00) {
-            devstat = 'ok';
-        }
-        else {
+            if (bytes[4] === 0x00) {
+                devstat = 'ok';
+            }
+            else {
 
-            for (var i = 7; i >= 3; i--) {
-                if (bitfield(bytes[4], i) === 1) {
-                    devstat.push(DevstatDict[i]);
+                for (var i = 7; i >= 3; i--) {
+                    if (bitfield(bytes[4], i) === 1) {
+                        devstat.push(DevstatDict[i]);
+                    }
                 }
             }
+            decode.devstat = devstat
+            decode.bat = bytes[5];
+            decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString() + "°C";
+            decode.angleX = (arrayConverter(bytes, 8, 2, false, true) / 100.0).toString() + "°";
+            decode.angleY = (arrayConverter(bytes, 10, 2, false, true) / 100.0).toString() + "°";
+            decode.dispX = (arrayToFloat(bytes, 12, false)).toString() + "mm";
+            decode.dispY = (arrayToFloat(bytes, 16, false)).toString() + "mm";
+            decode.dispZ = (arrayToFloat(bytes, 20, false)).toString() + "mm";
+            return true;
         }
-        decode.devstat = devstat
-        decode.bat = bytes[5];
-        decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString() + "°C";
-        decode.angleX = (arrayConverter(bytes, 8, 2, false, true) / 100.0).toString() + "°";
-        decode.angleY = (arrayConverter(bytes, 10, 2, false, true) / 100.0).toString() + "°";
-        decode.dispX = (arrayToFloat(bytes, 12, false)).toString() + "mm";
-        decode.dispY = (arrayToFloat(bytes, 16, false)).toString() + "mm";
-        decode.dispZ = (arrayToFloat(bytes, 20, false)).toString() + "mm";
-        return true;
-    }
-    
+
 
     return false;
 }
-function DecodeSinglePoint(decode, port, bytes) {
-    if (port == 10 ) {
-               
+function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
+    if (port == 10) {
 
+        // SINGLEPOINT
         // 0x1321, 0x1222, 0x1422 map to devtype for pressure and temperature and humidity sensors...
-        // Should not be mandatory if fport10 is always used for singlepoint
         if ([0x1321, 0x1222, 0x1422].includes(arrayToUint16(bytes, 0, false))) {
             decode.devtype = {}
             decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
@@ -498,7 +500,145 @@ function DecodeSinglePoint(decode, port, bytes) {
             }
             return true;
         }
-        
+
+        // MULTIPOINT
+        // 0x1121 should be single axis and 0x1521 should be tri-axis
+        else if ([0x1121, 0x1521].includes(arrayToUint16(bytes, 0, false))) {
+            decode.devtype = {}
+            decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
+            decode.cnt = arrayToUint16(bytes, 2, false, false);
+            decode.devstat = []
+            decode.devstat = getDevstat(bytes[4])
+            decode.bat = bytes[5];
+            decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString();
+
+            decode.vibration_information = {}
+            decode.vibration_information.frame_format = getBits(bytes[8], 0, 2)
+            decode.vibration_information.rotating_mode = getBits(bytes[8], 4, 1)
+            decode.vibration_information.axis = []
+            if (getBits(bytes[8], 5, 1) == 1)
+                decode.vibration_information.axis.push("x");
+            if (getBits(bytes[8], 6, 1) == 1)
+                decode.vibration_information.axis.push("y");
+            if (getBits(bytes[8], 7, 1) == 1)
+                decode.vibration_information.axis.push("z");
+
+            decode.preset_id = bytes[9];
+
+            // TODO : Ca decale tout !!!!
+            // decode.bw_mode = bytes[10];
+
+
+            decode.vibration_data = {}
+
+
+
+            switch (decode.vibration_information.frame_format) {
+                // DATA FORMAT 0
+                case 0:
+
+                    let axisSize = 10
+
+
+                    if (decode.vibration_information.axis.includes("x")) {
+                        decode.vibration_data.x = {}
+                        decode.vibration_data.x.spectrum_rms = arrayConverter(bytes, 10, 2, false)
+                        decode.vibration_data.x.time_p2p = arrayConverter(bytes, 12, 2, false)
+                        decode.vibration_data.x.average = arrayConverter(bytes, 14, 2, false)
+                        decode.vibration_data.x.std = arrayConverter(bytes, 16, 2, false)
+                        decode.vibration_data.x.mid_range = arrayConverter(bytes, 18, 2, false)
+                    }
+
+                    if (decode.vibration_information.axis.includes("y")) {
+                        decode.vibration_data.y = {}
+                        decode.vibration_data.y.spectrum_rms = arrayConverter(bytes, axisSize + 10, 2, false)
+                        decode.vibration_data.y.time_p2p = arrayConverter(bytes, axisSize + 12, 2, false)
+                        decode.vibration_data.y.average = arrayConverter(bytes, axisSize + 14, 2, false)
+                        decode.vibration_data.y.std = arrayConverter(bytes, axisSize + 16, 2, false)
+                        decode.vibration_data.y.mid_range = arrayConverter(bytes, axisSize + 18, 2, false)
+                    }
+
+                    if (decode.vibration_information.axis.includes("z")) {
+                        decode.vibration_data.z = {}
+                        decode.vibration_data.z.spectrum_rms = arrayConverter(bytes, 2 * axisSize + 10, 2, false)
+                        decode.vibration_data.z.time_p2p = arrayConverter(bytes, 2 * axisSize + 12, 2, false)
+                        decode.vibration_data.z.average = arrayConverter(bytes, 2 * axisSize + 14, 2, false)
+                        decode.vibration_data.z.std = arrayConverter(bytes, 2 * axisSize + 16, 2, false)
+                        decode.vibration_data.z.mid_range = arrayConverter(bytes, 2 * axisSize + 18, 2, false)
+                    }
+
+                    break;
+
+                // DATA FORMAT 1 is the default one, because it the format selected in the default preset ID 0
+                case 1:
+                    decode.vibration_data.spectrum_rms = arrayConverter(bytes, 10, 2, false)
+                    decode.vibration_data.time_p2p = arrayConverter(bytes, 12, 2, false)
+                    decode.vibration_data.velocity = arrayConverter(bytes, 14, 2, false)
+                    decode.vibration_data.windows = []
+
+                    let windowSize = 14
+                    // Les fenetre demarrent a partir de cette offset
+                    let offsetStartWindows = 16
+
+                    // On enleve tous les bytes de header, on enleve la derniere fenetre si elle est fragmente
+                    let windowsNumber = Math.floor((bytes.length - offsetStartWindows) / windowSize)
+
+                    // Parcours de toutes les fenetres, par defaut il y en a 8 en preset ID 0 
+                    for (let windowIndex = 0; windowIndex < windowsNumber; windowIndex++) {
+                        let window_data = {}
+                        // Two first byte of the window
+                        window_data.rms_window = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize, 2, false)
+                        window_data.peak1_frequency = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
+                        window_data.peak1_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 4, 2, false)
+                        window_data.peak2_frequency = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 6, 2, false)
+                        window_data.peak2_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 8, 2, false)
+                        window_data.peak3_frequency = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 10, 2, false)
+                        window_data.peak3_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 12, 2, false)
+
+                        decode.vibration_data.windows.push(window_data);
+
+                    }
+
+                    break;
+
+                // DATA FORMAT 2
+                case 2:
+                    decode.vibration_data.spectrum_rms = arrayConverter(bytes, 10, 2, false)
+                    decode.vibration_data.time_p2p = arrayConverter(bytes, 12, 2, false)
+                    decode.vibration_data.velocity = arrayConverter(bytes, 14, 2, false)
+                    decode.vibration_data.peak_cnt = bytes[16]
+                    decode.vibration_data.peaks = []
+
+                    let peak_size = 19;
+
+                    /** Les peaks demarrent a partir de cette offset */
+                    let offsetStartPeaks = 17
+
+                    // Ce nombre (BigInt) contiens tous les peaks
+                    let peaks = uint8ArrayToBigInt(bytes.slice(offsetStartPeaks, peak_size * decode.vibration_data.peak_cnt))
+
+                    for (let peakIndex = 0; peakIndex < decode.vibration_data.peak_cnt; peakIndex++) {
+                        let peak_data = {}
+
+                        // Bin index is 11 bit wide
+                        peak_data.bin_index = getBits(peaks, peakIndex * peak_size, 11)
+                        // Magnitude is just after, 8 bit wide
+                        peak_data.magnitude = dBDecompression(getBits(peaks, peakIndex * peak_size + 11, 8))
+
+
+
+                        decode.vibration_data.peaks.push(peak_data);
+                    }
+                    break;
+                default:
+                    decode.vibration_data = "Unknown Vibration Data Frame Format"
+                    break;
+            }
+
+            return true;
+        }
+
+
     }
     return false;
 }
@@ -520,7 +660,7 @@ function getDevstat(u8devstat) {
         devstat.ok = 'ok';
     }
     else {
-       
+
         for (var i = 7; i >= 0; i--) {
             if (bitfield(u8devstat, i) === 1) {
                 devstat.push(DevstatDict[i]);
@@ -528,7 +668,7 @@ function getDevstat(u8devstat) {
         }
     }
     return devstat;
-         }
+}
 function getDevtype(u16devtype) {
     var devtype = {};
 
@@ -541,7 +681,8 @@ function getDevtype(u16devtype) {
         1: "Vibration",
         2: "Temperature",
         3: "Pressure",
-        4: "Humidity"
+        4: "Humidity",
+        5: "Vibration 3-axis"
     }
     var SensorUnitDict = {
         0: "Error",
@@ -558,7 +699,8 @@ function getDevtype(u16devtype) {
     var OutputDict = {
         0: "Error",
         1: "Float",
-        2: "Integer"
+        2: "Integer",
+        15: "N/A"
     }
     devtype.Platform = SwPlatformDict[((u16devtype >> 12) & 0x0F)];
     devtype.Sensor = SensorDict[((u16devtype >> 8) & 0x0F)];
@@ -569,11 +711,11 @@ function getDevtype(u16devtype) {
 }
 function arrayToString(arr, offset = 0, size = arr.length - offset) {
     var text = ''
-    text = arr.slice(offset, offset+size).map(byte => byte.toString(16)).join(',');
+    text = arr.slice(offset, offset + size).map(byte => byte.toString(16)).join(',');
 
     return text
 }
-function arrayToAscii(arr, offset=0, size = arr.length - offset) {
+function arrayToAscii(arr, offset = 0, size = arr.length - offset) {
     var text = ''
     for (var i = 0; i < size; i++) {
         text += String.fromCharCode(arr[i + offset]);
@@ -593,7 +735,7 @@ function arrayToUint32(arr, offset, littleEndian = true) {
     return (arrayConverter(arr, offset, 4, littleEndian, false));
 }
 function arrayToUint16(arr, offset, littleEndian = true) {
-    return (arrayConverter(arr, offset, 2, littleEndian,false));
+    return (arrayConverter(arr, offset, 2, littleEndian, false));
 }
 function arrayToInt32(arr, offset, littleEndian = true) {
     return (arrayConverter(arr, offset, 4, littleEndian, true));
@@ -602,7 +744,7 @@ function arrayToInt16(arr, offset, littleEndian = true) {
     return (arrayConverter(arr, offset, 2, littleEndian, true));
 }
 function arrayToFloatOld(arr, offset, littleEndian = true) {
-    return hexToFloat(arrayConverter(arr, offset, 4, littleEndian,false));
+    return hexToFloat(arrayConverter(arr, offset, 4, littleEndian, false));
 }
 
 function arrayToFloat(arr, offset, littleEndian = true) {
@@ -638,4 +780,58 @@ function bitfield(val, offset) {
 
 function dBDecompression(val) {
     return Math.pow(10, ((val * 0.3149606) - 49.0298) / 20);
+}
+
+
+/** Extrait les bits d'un nombre
+ * 
+ * Exemple : 0b00110001 index 2 size 2, -> 0b11 
+ * 
+ * number peut etre n importe quel representation hexadecimale
+ */
+function getBits(number, index, size) {
+    // Input validation
+    if (number < 0) {
+        console.error("Invalid input. Please provide a non-negative number.")
+        return null;
+    }
+
+    if (typeof index !== 'number' || index < 0) {
+        console.error("Invalid index input. Please provide a non-negative number.");
+        return null;
+    }
+
+    if (typeof size !== 'number' || size < 1) {
+        console.error("Invalid size input. Please provide a positive number.");
+        return null;
+    }
+
+    // Convert byte to binary
+    let binary = number.toString(2);
+
+    // Add leading zeros if necessary
+    while (binary.length % 8 !== 0) {
+        binary = '0' + binary;
+    }
+
+    // Extract bits specified by index and size
+    let extractedBits = binary.slice(index, index + size);
+
+    // Convert extracted bits to integer
+    let result = parseInt(extractedBits, 2);
+
+    return result;
+}
+
+
+/** Fonction pour convertir un Uint8Array en BigInt
+ * 
+ * En big endian
+ */
+function uint8ArrayToBigInt(uint8Array) {
+    let result = BigInt(0);
+    for (let i = 0; i < uint8Array.length; i++) {
+        result = (result << BigInt(8)) | BigInt(uint8Array[i]);
+    }
+    return result;
 }

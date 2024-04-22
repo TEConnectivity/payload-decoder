@@ -1,0 +1,96 @@
+<p> Frame format Multipoint Data Format 2 :
+    1121ffffff0009c44700ac26270bbd000a013b402b64046b80bc600f7a0495400a800c6e026a8019ff</p>
+
+<input id="input"
+    value="1121ffffff000a2847000000401f630fe50a0400a7000000000000000000fe053c0091000000000000000000350742008e000000000000000000570adc008a00000000000000000056069f0187000000000000000000680ca802850000000000000000000000df07920000000000000000000000000000000000000000000000">Raw
+Payload (HEX)</input>
+<input id="fport" value="10">Fport</input>
+<br>
+<button onclick="handle_click()">Decode</button>
+<pre id="output"></pre>
+
+<script type="text/javascript" src="TnnJsDecoder/TE_TtnDecoder.js"></script>
+
+<script type="text/javascript">
+
+    document.getElementById("input").addEventListener("keydown", function (e) {
+        if (e.code === "Enter") {  //checks whether the pressed key is "Enter"
+            handle_click();
+        }
+    });
+
+    function handle_click() {
+        let input = parseHexString(document.getElementById("input").value.trim().replace(/\s/g, ''));
+        let fport = document.getElementById("fport").value
+        let output = syntaxHighlight(te_decoder(input, fport))
+        document.getElementById("output").innerHTML = output
+    }
+
+    function parseHexString(str) {
+        var result = [];
+        // Ignore any trailing single digit; I don't know what your needs
+        // are for this case, so you may want to throw an error or convert
+        // the lone digit depending on your needs.
+        while (str.length >= 2) {
+            result.push(parseInt(str.substring(0, 2), 16));
+            str = str.substring(2, str.length);
+        }
+
+        return result;
+    }
+
+    function syntaxHighlight(json) {
+        if (typeof json != 'string') {
+            json = JSON.stringify(json, undefined, 2);
+        }
+        json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+            var cls = 'number';
+            if (/^"/.test(match)) {
+                if (/:$/.test(match)) {
+                    cls = 'key';
+                } else {
+                    cls = 'string';
+                }
+            } else if (/true|false/.test(match)) {
+                cls = 'boolean';
+            } else if (/null/.test(match)) {
+                cls = 'null';
+            }
+            return '<span class="' + cls + '">' + match + '</span>';
+        });
+    }
+
+</script>
+
+<style>
+    input {
+        width: 1000px;
+    }
+
+    pre {
+        outline: 1px solid #ccc;
+        padding: 5px;
+        margin: 5px;
+    }
+
+    .string {
+        color: green;
+    }
+
+    .number {
+        color: darkorange;
+    }
+
+    .boolean {
+        color: blue;
+    }
+
+    .null {
+        color: magenta;
+    }
+
+    .key {
+        color: red;
+    }
+</style>
