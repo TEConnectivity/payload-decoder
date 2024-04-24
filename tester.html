@@ -6,12 +6,17 @@
 Payload (HEX)</input>
 <input id="fport" value="10">Fport</input>
 <br>
-<button onclick="handle_click()">Decode</button>
+<button id="button_decode">Decode</button>
 <pre id="output"></pre>
 
-<script type="text/javascript" src="TnnJsDecoder/TE_TtnDecoder.js"></script>
 
-<script type="text/javascript">
+<script type="module">
+
+
+    import { te_decoder } from "./TnnJsDecoder/TE_TtnDecoder.js"
+
+
+    document.getElementById("button_decode").addEventListener("click", handle_click);
 
     document.getElementById("input").addEventListener("keydown", function (e) {
         if (e.code === "Enter") {  //checks whether the pressed key is "Enter"

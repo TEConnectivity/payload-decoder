@@ -1,3 +1,8 @@
+/** Function reserved for TTN use ONLY
+ * 
+ * @param {*} input 
+ * @returns 
+ */
 function decodeUplink(input) {
     // input has the following structure:
     // {
@@ -8,18 +13,22 @@ function decodeUplink(input) {
 
     // Should RETURN :
     //
-    // data: {
-    //     bytes: input.bytes,
-    //   },
-    //   warnings: ["warning 1", "warning 2"], // optional
-    //   errors: ["error 1", "error 2"], // optional (if set, the decoding failed)
+    // data: { bytes: input.bytes , },
+    // warnings: ["warning 1", "warning 2"], // optional
+    // errors: ["error 1", "error 2"], // optional (if set, the decoding failed)
     // };
 
     return te_decoder(input.bytes, input.fPort)
 }
 
 
-function te_decoder(bytes, port) {
+/**
+ * 
+ * @param {Int8Array} bytes 
+ * @param {number} port 
+ * @returns Decoded object
+ */
+export function te_decoder(bytes, port) {
     var ttn_output = { data: {} }
     var decode = ttn_output.data
 
@@ -43,6 +52,8 @@ function te_decoder(bytes, port) {
     return ttn_output;
 
 }
+
+
 
 function Decode8931EX(decode, port, bytes) {
     if (port == 5) {
@@ -481,6 +492,27 @@ function DecodeTiltSensor(decode, port, bytes) {
 function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
     if (port == 10) {
 
+        // Mapping between bw_mode and bin resolution
+        var BW_MODE_RESOLUTION = {
+            0x00: 0.125,
+            0x01: 0.25,
+            0x02: 0.5,
+            0x03: 1,
+            0x04: 2,
+            0x05: 3,
+            0x06: 4,
+            0x07: 5,
+            0x08: 6,
+            0x09: 7,
+            0x0A: 8,
+            0x0B: 9,
+            0x0C: 10,
+            0x0D: 11,
+            0x0E: 12,
+            0x0F: 13,
+        }
+
+
         // SINGLEPOINT
         // 0x1321, 0x1222, 0x1422 map to devtype for pressure and temperature and humidity sensors...
         if ([0x1321, 0x1222, 0x1422].includes(arrayToUint16(bytes, 0, false))) {
@@ -522,16 +554,14 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
                 decode.vibration_information.axis.push("y");
             if (getBits(bytes[8], 7, 1) == 1)
                 decode.vibration_information.axis.push("z");
-
             decode.preset_id = bytes[9];
-
-            // TODO : Ca decale tout !!!!
-            // decode.bw_mode = bytes[10];
+            decode.bw_mode = bytes[10];
 
 
             decode.vibration_data = {}
 
-
+            // // DEBUG JEREMY
+            // decode.vibration_information.frame_format = 2
 
             switch (decode.vibration_information.frame_format) {
                 // DATA FORMAT 0
@@ -542,43 +572,43 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
 
                     if (decode.vibration_information.axis.includes("x")) {
                         decode.vibration_data.x = {}
-                        decode.vibration_data.x.spectrum_rms = arrayConverter(bytes, 10, 2, false)
-                        decode.vibration_data.x.time_p2p = arrayConverter(bytes, 12, 2, false)
-                        decode.vibration_data.x.average = arrayConverter(bytes, 14, 2, false)
-                        decode.vibration_data.x.std = arrayConverter(bytes, 16, 2, false)
-                        decode.vibration_data.x.mid_range = arrayConverter(bytes, 18, 2, false)
+                        decode.vibration_data.x.spectrum_rms = arrayConverter(bytes, 11, 2, false)
+                        decode.vibration_data.x.time_p2p = arrayConverter(bytes, 13, 2, false)
+                        decode.vibration_data.x.average = arrayConverter(bytes, 15, 2, false)
+                        decode.vibration_data.x.std = arrayConverter(bytes, 17, 2, false)
+                        decode.vibration_data.x.mid_range = arrayConverter(bytes, 19, 2, false)
                     }
 
                     if (decode.vibration_information.axis.includes("y")) {
                         decode.vibration_data.y = {}
-                        decode.vibration_data.y.spectrum_rms = arrayConverter(bytes, axisSize + 10, 2, false)
-                        decode.vibration_data.y.time_p2p = arrayConverter(bytes, axisSize + 12, 2, false)
-                        decode.vibration_data.y.average = arrayConverter(bytes, axisSize + 14, 2, false)
-                        decode.vibration_data.y.std = arrayConverter(bytes, axisSize + 16, 2, false)
-                        decode.vibration_data.y.mid_range = arrayConverter(bytes, axisSize + 18, 2, false)
+                        decode.vibration_data.y.spectrum_rms = arrayConverter(bytes, axisSize + 11, 2, false)
+                        decode.vibration_data.y.time_p2p = arrayConverter(bytes, axisSize + 13, 2, false)
+                        decode.vibration_data.y.average = arrayConverter(bytes, axisSize + 15, 2, false)
+                        decode.vibration_data.y.std = arrayConverter(bytes, axisSize + 17, 2, false)
+                        decode.vibration_data.y.mid_range = arrayConverter(bytes, axisSize + 19, 2, false)
                     }
 
                     if (decode.vibration_information.axis.includes("z")) {
                         decode.vibration_data.z = {}
-                        decode.vibration_data.z.spectrum_rms = arrayConverter(bytes, 2 * axisSize + 10, 2, false)
-                        decode.vibration_data.z.time_p2p = arrayConverter(bytes, 2 * axisSize + 12, 2, false)
-                        decode.vibration_data.z.average = arrayConverter(bytes, 2 * axisSize + 14, 2, false)
-                        decode.vibration_data.z.std = arrayConverter(bytes, 2 * axisSize + 16, 2, false)
-                        decode.vibration_data.z.mid_range = arrayConverter(bytes, 2 * axisSize + 18, 2, false)
+                        decode.vibration_data.z.spectrum_rms = arrayConverter(bytes, 2 * axisSize + 11, 2, false)
+                        decode.vibration_data.z.time_p2p = arrayConverter(bytes, 2 * axisSize + 13, 2, false)
+                        decode.vibration_data.z.average = arrayConverter(bytes, 2 * axisSize + 15, 2, false)
+                        decode.vibration_data.z.std = arrayConverter(bytes, 2 * axisSize + 17, 2, false)
+                        decode.vibration_data.z.mid_range = arrayConverter(bytes, 2 * axisSize + 19, 2, false)
                     }
 
                     break;
 
                 // DATA FORMAT 1 is the default one, because it the format selected in the default preset ID 0
                 case 1:
-                    decode.vibration_data.spectrum_rms = arrayConverter(bytes, 10, 2, false)
-                    decode.vibration_data.time_p2p = arrayConverter(bytes, 12, 2, false)
-                    decode.vibration_data.velocity = arrayConverter(bytes, 14, 2, false)
+                    decode.vibration_data.spectrum_rms = arrayConverter(bytes, 11, 2, false)
+                    decode.vibration_data.time_p2p = arrayConverter(bytes, 13, 2, false)
+                    decode.vibration_data.velocity = arrayConverter(bytes, 15, 2, false)
                     decode.vibration_data.windows = []
 
                     let windowSize = 14
                     // Les fenetre demarrent a partir de cette offset
-                    let offsetStartWindows = 16
+                    let offsetStartWindows = 17
 
                     // On enleve tous les bytes de header, on enleve la derniere fenetre si elle est fragmente
                     let windowsNumber = Math.floor((bytes.length - offsetStartWindows) / windowSize)
@@ -603,35 +633,39 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
 
                 // DATA FORMAT 2
                 case 2:
-                    decode.vibration_data.spectrum_rms = arrayConverter(bytes, 10, 2, false)
-                    decode.vibration_data.time_p2p = arrayConverter(bytes, 12, 2, false)
-                    decode.vibration_data.velocity = arrayConverter(bytes, 14, 2, false)
-                    decode.vibration_data.peak_cnt = bytes[16]
+                    decode.vibration_data.spectrum_rms = arrayConverter(bytes, 11, 2, false)
+                    decode.vibration_data.time_p2p = arrayConverter(bytes, 13, 2, false)
+                    decode.vibration_data.velocity = arrayConverter(bytes, 15, 2, false)
+                    decode.vibration_data.peak_cnt = bytes[17]
                     decode.vibration_data.peaks = []
 
                     let peak_size = 19;
 
                     /** Les peaks demarrent a partir de cette offset */
-                    let offsetStartPeaks = 17
+                    let offsetStartPeaks = 18
 
                     // Ce nombre (BigInt) contiens tous les peaks
                     let peaks = uint8ArrayToBigInt(bytes.slice(offsetStartPeaks, peak_size * decode.vibration_data.peak_cnt))
+                    console.log(peaks)
 
                     for (let peakIndex = 0; peakIndex < decode.vibration_data.peak_cnt; peakIndex++) {
                         let peak_data = {}
 
                         // Bin index is 11 bit wide
                         peak_data.bin_index = getBits(peaks, peakIndex * peak_size, 11)
+                        peak_data.frequency = peak_data.bin_index * BW_MODE_RESOLUTION[decode.bw_mode]
+
+
+
                         // Magnitude is just after, 8 bit wide
-                        peak_data.magnitude = dBDecompression(getBits(peaks, peakIndex * peak_size + 11, 8))
-
-
+                        peak_data.magnitude_compressed = getBits(peaks, peakIndex * peak_size + 11, 8)
+                        peak_data.magnitude_rms = dBDecompression(peak_data.magnitude_compressed)
 
                         decode.vibration_data.peaks.push(peak_data);
                     }
                     break;
                 default:
-                    decode.vibration_data = "Unknown Vibration Data Frame Format"
+                    decode.vibration_data.warning = "Unknown Vibration Data Frame Format"
                     break;
             }
 
@@ -823,6 +857,8 @@ function getBits(number, index, size) {
     return result;
 }
 
+// Tell linter to exclude BigInt from errors/warning 
+/* global BigInt */
 
 /** Fonction pour convertir un Uint8Array en BigInt
  * 
@@ -835,3 +871,7 @@ function uint8ArrayToBigInt(uint8Array) {
     }
     return result;
 }
+
+
+
+
