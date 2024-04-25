@@ -34,6 +34,9 @@ export function te_decoder(bytes, port) {
     var decode = ttn_output.data
 
 
+    port = parseInt(port)
+
+
     console.log(bytes)
 
     if (DecodeFwRevision(decode, port, bytes) === false)
@@ -565,7 +568,7 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
             decode.vibration_data = {}
 
             // // DEBUG JEREMY
-            // decode.vibration_information.frame_format = 2
+            // decode.vibration_information.frame_format = 0
 
             switch (decode.vibration_information.frame_format) {
                 // DATA FORMAT 0
