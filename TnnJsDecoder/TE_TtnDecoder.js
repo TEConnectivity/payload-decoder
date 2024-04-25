@@ -620,16 +620,23 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
                     // On enleve tous les bytes de header, on enleve la derniere fenetre si elle est fragmente
                     let windowsNumber = Math.floor((bytes.length - offsetStartWindows) / windowSize)
 
+
                     // Parcours de toutes les fenetres, par defaut il y en a 8 en preset ID 0 
                     for (let windowIndex = 0; windowIndex < windowsNumber; windowIndex++) {
                         let window_data = {}
                         // Two first byte of the window
                         window_data.rms_window = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize, 2, false)
-                        window_data.peak1_frequency = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
+
+                        window_data.peak1_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
+                        window_data.peak1_frequency = window_data.peak1_bin * BW_MODE_RESOLUTION[decode.bw_mode]
                         window_data.peak1_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 4, 2, false)
-                        window_data.peak2_frequency = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 6, 2, false)
+
+                        window_data.peak2_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 6, 2, false)
+                        window_data.peak2_frequency = window_data.peak2_bin * BW_MODE_RESOLUTION[decode.bw_mode]
                         window_data.peak2_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 8, 2, false)
-                        window_data.peak3_frequency = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 10, 2, false)
+
+                        window_data.peak3_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 10, 2, false)
+                        window_data.peak3_frequency = window_data.peak3_bin * BW_MODE_RESOLUTION[decode.bw_mode]
                         window_data.peak3_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 12, 2, false)
 
                         decode.vibration_data.windows.push(window_data);
