@@ -3,6 +3,7 @@
  * @param {*} input 
  * @returns 
  */
+// eslint-disable-next-line
 function decodeUplink(input) {
     // input has the following structure:
     // {
@@ -24,7 +25,7 @@ function decodeUplink(input) {
 
 /**
  * 
- * @param {Int8Array} bytes 
+ * @param {Uint8Array} bytes 
  * @param {number} port 
  * @returns Decoded object
  */
@@ -56,11 +57,11 @@ export function te_decoder(bytes, port) {
 
 
 function Decode8931EX(decode, port, bytes) {
-    if (port == 5) {
-        decode.bat = (bytes[1] & 0x0F) == 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
+    if (port === 5) {
+        decode.bat = (bytes[1] & 0x0F) === 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
 
         decode.devstat = {};
-        decode.devstat.rotEn = (bitfield(bytes[1], 7) == 1) ? 'enabled' : 'disabled';
+        decode.devstat.rotEn = (bitfield(bytes[1], 7) === 1) ? 'enabled' : 'disabled';
         decode.devstat.temp = (bitfield(bytes[1], 6) === 0) ? 'ok' : 'err';
         decode.devstat.acc = (bitfield(bytes[1], 5) === 0) ? 'ok' : 'err';
 
@@ -83,7 +84,7 @@ function Decode8931EX(decode, port, bytes) {
         for (var i = 0; i < decode.axisInfo.PeakNb * 19; i++) {
             peakVal |= ((bytes[6 + Math.trunc((i / 8))] >> (8 - 1 - (i % 8))) & 0x01) << (19 - bitCount - 1);
             bitCount++;
-            if (bitCount == 19) {
+            if (bitCount === 19) {
 
                 var peak = {};
                 peak.Freq = peakVal >> 8;
@@ -101,7 +102,7 @@ function Decode8931EX(decode, port, bytes) {
     }
 
 
-    else if (port == 133 || port == 197) {
+    else if (port === 133 || port === 197) {
         // 133 start fragment, 197 end fragment
         decode.val = '8931 : Fragmented frame NOT SUPPORTED by TTN Live Decoder';
         decode.port = port;
@@ -114,7 +115,7 @@ function Decode8931EX(decode, port, bytes) {
 }
 
 function Decode8911EX(decode, port, bytes) {
-    if (port == 1) {
+    if (port === 1) {
         if (bytes.length >= 1) {
             decode.bat = bytes[0] + '%';
         }
@@ -123,7 +124,7 @@ function Decode8911EX(decode, port, bytes) {
         }
         if (bytes.length >= 4) {
             decode.temp = arrayConverter(bytes, 2, 2);
-            decode.temp = decode.temp == 0x7FFF ? 'err' : round(((decode.temp / 10.0) - 100), 1);
+            decode.temp = decode.temp === 0x7FFF ? 'err' : round(((decode.temp / 10.0) - 100), 1);
         }
         if (bytes.length >= 6) {
             decode.sig_rms = round(arrayConverter(bytes, 4, 2) / 1000.0, 3);
@@ -135,9 +136,9 @@ function Decode8911EX(decode, port, bytes) {
             decode.devstat = {};
             decode.devstat.acc = (bitfield(bytes[7], 5) === 0) ? 'ok' : 'err';
             decode.devstat.temp = (bitfield(bytes[7], 6) === 0) ? 'ok' : 'err';
-            decode.devstat.rotEn = (bitfield(bytes[7], 7) == 1) ? 'enabled' : 'disabled';
-            decode.devstat.com = (bitfield(bytes[7], 3) == 0) ? 'ok' : 'err';
-            decode.devstat.battery = (bitfield(bytes[7], 0) == 0) ? 'ok' : 'err';
+            decode.devstat.rotEn = (bitfield(bytes[7], 7) === 1) ? 'enabled' : 'disabled';
+            decode.devstat.com = (bitfield(bytes[7], 3) === 0) ? 'ok' : 'err';
+            decode.devstat.battery = (bitfield(bytes[7], 0) === 0) ? 'ok' : 'err';
         }
         decode.peaks = [];
         for (var i = 0; i < decode.peak_nb && ((i * 5 + 5) < (bytes.length - 8)); i++) {
@@ -149,7 +150,7 @@ function Decode8911EX(decode, port, bytes) {
 
         } return true;
     }
-    else if (port == 129 || port == 193) {
+    else if (port === 129 || port === 193) {
         // 129 start fragment, 193 end fragment
         decode.val = '8911 : Fragmented frame NOT SUPPORTED by TTN Live Decoder';
         decode.port = port;
@@ -160,7 +161,7 @@ function Decode8911EX(decode, port, bytes) {
 }
 
 function DecodeFwRevision(decode, port, bytes) {
-    if (port == 2) {
+    if (port === 2) {
         decode.firmware_version = arrayToAscii(bytes);
         return true;
     }
@@ -168,8 +169,8 @@ function DecodeFwRevision(decode, port, bytes) {
 }
 
 function DecodeU8900(decode, port, bytes) {
-    if (port == 4) {
-        decode.bat = (bytes[1] & 0x0F) == 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
+    if (port === 4) {
+        decode.bat = (bytes[1] & 0x0F) === 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
 
         if (bytes[0] === 0x00) {
             decode.devstat = 'normal';
@@ -190,11 +191,11 @@ function DecodeU8900(decode, port, bytes) {
 }
 
 function DecodeU8900Pof(decode, port, bytes) {
-    if (port == 104) {
+    if (port === 104) {
         // MCU Flags
-        decode.pream = bytes[0] == 0x3C ? 'OK' : 'KO !!!';
+        decode.pream = bytes[0] === 0x3C ? 'OK' : 'KO !!!';
         decode.rst_cnt = arrayConverter(bytes, 1, 2, true);
-        decode.pof_tx = bytes[3] & 0x01 == 0x01 ? 'MCU POF !!!' : 'OK';
+        decode.pof_tx = (bytes[3] & 0x01) === 0x01 ? 'MCU POF !!!' : 'OK';
         decode.pof_idle = (bitfield(bytes[4], 0) === 0) ? 'OK' : 'MCU POF !!!';
         decode.pof_snsmeas = (bitfield(bytes[4], 1) === 0) ? 'OK' : 'MCU POF !!!';
         decode.pof_batmeas = (bitfield(bytes[4], 2) === 0) ? 'OK' : 'MCU POF !!!';
@@ -213,13 +214,13 @@ function DecodeU8900Pof(decode, port, bytes) {
             decode.devstat.Unsup = (bitfield(bytes[7], 4) === 0) ? 'OK' : 'err';
         }
 
-        decode.batt_lvl = (bytes[8] & 0x0F) == 0xF ? 'ERROR' : (((bytes[8] & 0x0F) * 10) + '%');
-        decode.patbatt = bytes[9] == 0xA5 ? 'OK' : 'Corrupted';
-        decode.pattemp = bytes[9] == 0xA5 ? 'OK' : 'Corrupted';
+        decode.batt_lvl = (bytes[8] & 0x0F) === 0xF ? 'ERROR' : (((bytes[8] & 0x0F) * 10) + '%');
+        decode.patbatt = bytes[9] === 0xA5 ? 'OK' : 'Corrupted';
+        decode.pattemp = bytes[9] === 0xA5 ? 'OK' : 'Corrupted';
 
         decode.mcu_temp = arrayConverter(bytes, 10, 2, true, true) / 100.0 + '°C';
         decode.pres = isNaN(arrayToFloat(bytes, 13)) ? 'ERROR' : round(arrayToFloat(bytes, 13), 3) + ' Bar';
-        decode.patend = bytes[17] == 0x5A ? 'OK' : 'KO !!! ';
+        decode.patend = bytes[17] === 0x5A ? 'OK' : 'KO !!! ';
         var i = 0;
         decode.zdata = [];
         for (i = 0; i < bytes.length; i++) {
@@ -234,7 +235,7 @@ function DecodeU8900Pof(decode, port, bytes) {
 //port 30  /EyEARwhj keep alive 132100470863
 function DecodeOperationResponses(decode, port, bytes) {
     var res = false;
-    if (port == 20) {
+    if (port === 20) {
         res = true;
         var OperationRepsType = {
             0: "Read",
@@ -320,7 +321,7 @@ function DecodeOperationResponses(decode, port, bytes) {
                         decode.ThsCfg.cfg = {};
                         decode.ThsCfg.cfg.eventFlag = bitfield(payload[2], 7);
                         decode.ThsCfg.cfg.enable = bitfield(payload[2], 6);
-                        decode.ThsCfg.cfg.condition = (bitfield(payload[2], 5) == 1) ? '<' : '>';
+                        decode.ThsCfg.cfg.condition = (bitfield(payload[2], 5) === 1) ? '<' : '>';
                         decode.ThsCfg.cfg.autoclr = bitfield(payload[2], 4);
                         decode.ThsCfg.cfg.actionMeasIntEn = bitfield(payload[2], 3)
                         decode.ThsCfg.cfg.actionAdvModeEn = bitfield(payload[2], 2)
@@ -356,6 +357,8 @@ function DecodeOperationResponses(decode, port, bytes) {
                         decode.ThsCfg.ComMode.ble = ThsComBleMode[payload[2] & 0x03];
                         decode.ThsCfg.ComMode.lora = ThsComLoraMode[payload[3] & 0x03];
                         break;
+                    default:
+                        break;
                 }
                 break;
             case 0xDB01:
@@ -375,6 +378,7 @@ function DecodeOperationResponses(decode, port, bytes) {
                 decode.Datalog.length = payload[3];
                 var dataSize = DataLogDataSize[payload[0]];
                 decode.Datalog.data = [];
+                // eslint-disable-next-line
                 for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize * (i + 1) + 4); i++) {
                     var dataN = {};
                     dataN.index = decode.Datalog.index + i;
@@ -434,7 +438,7 @@ function DecodeOperationResponses(decode, port, bytes) {
     return res;
 }
 function DecodeKeepAlive(decode, port, bytes) {
-    if (port == 30) {
+    if (port === 30) {
         decode.msgType = "Keep Alive";
         decode.devtype = {}
         decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
@@ -451,8 +455,8 @@ function DecodeKeepAlive(decode, port, bytes) {
 }
 function DecodeTiltSensor(decode, port, bytes) {
     decode.size = bytes.length;
-    if (port == 10)
-        if (0x2411 == arrayToUint16(bytes, 0, false) && bytes.length == 24) {
+    if (port === 10)
+        if (0x2411 === arrayToUint16(bytes, 0, false) && bytes.length === 24) {
             decode.cnt = arrayToUint16(bytes, 2, false, false);
             var devstat;
             devstat = [];
@@ -490,7 +494,7 @@ function DecodeTiltSensor(decode, port, bytes) {
     return false;
 }
 function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
-    if (port == 10) {
+    if (port === 10) {
 
         // Mapping between bw_mode and bin resolution
         var BW_MODE_RESOLUTION = {
@@ -524,7 +528,7 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
             decode.bat = bytes[5];
 
             decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString();
-            if (decode.devtype.Output == "Float") {
+            if (decode.devtype.Output === "Float") {
                 decode.data = (arrayToFloat(bytes, 8, false)).toString();
             }
             else {
@@ -548,11 +552,11 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
             decode.vibration_information.frame_format = getBits(bytes[8], 0, 2)
             decode.vibration_information.rotating_mode = getBits(bytes[8], 4, 1)
             decode.vibration_information.axis = []
-            if (getBits(bytes[8], 5, 1) == 1)
+            if (getBits(bytes[8], 5, 1) === 1)
                 decode.vibration_information.axis.push("x");
-            if (getBits(bytes[8], 6, 1) == 1)
+            if (getBits(bytes[8], 6, 1) === 1)
                 decode.vibration_information.axis.push("y");
-            if (getBits(bytes[8], 7, 1) == 1)
+            if (getBits(bytes[8], 7, 1) === 1)
                 decode.vibration_information.axis.push("z");
             decode.preset_id = bytes[9];
             decode.bw_mode = bytes[10];
@@ -760,14 +764,7 @@ function round(value, decimal) {
     return Math.round(value * Math.pow(10, decimal)) / Math.pow(10, decimal);
 
 }
-function hexToFloat(hex) {
-    var s = hex >> 31 ? -1 : 1;
-    var e = (hex >> 23) & 0xFF;
-    return s * (hex & 0x7fffff | 0x800000) * 1.0 / Math.pow(2, 23) * Math.pow(2, (e - 127))
-}
-function arrayToUint32(arr, offset, littleEndian = true) {
-    return (arrayConverter(arr, offset, 4, littleEndian, false));
-}
+
 function arrayToUint16(arr, offset, littleEndian = true) {
     return (arrayConverter(arr, offset, 2, littleEndian, false));
 }
@@ -777,9 +774,7 @@ function arrayToInt32(arr, offset, littleEndian = true) {
 function arrayToInt16(arr, offset, littleEndian = true) {
     return (arrayConverter(arr, offset, 2, littleEndian, true));
 }
-function arrayToFloatOld(arr, offset, littleEndian = true) {
-    return hexToFloat(arrayConverter(arr, offset, 4, littleEndian, false));
-}
+
 
 function arrayToFloat(arr, offset, littleEndian = true) {
     let view = new DataView(new ArrayBuffer(4));
@@ -795,7 +790,7 @@ function arrayConverter(arr, offset, size, littleEndian = true, isSigned = false
     // The reading sense depends on endianess, by default littleEndian (from right to left)
     var outputval = 0;
     for (var i = 0; i < size; i++) {
-        if (littleEndian == false) {
+        if (littleEndian === false) {
             outputval |= arr[offset + size - i - 1] << (i * 8);
         }
         else {
