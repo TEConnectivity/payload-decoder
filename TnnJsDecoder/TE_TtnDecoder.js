@@ -37,7 +37,6 @@ export function te_decoder(bytes, port) {
     port = parseInt(port)
 
 
-    console.log(bytes)
 
     if (DecodeFwRevision(decode, port, bytes) === false)
         if (Decode8911EX(decode, port, bytes) === false)
@@ -660,7 +659,6 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
 
                     // Ce nombre (BigInt) contiens tous les peaks
                     let peaks = uint8ArrayToBigInt(bytes.slice(offsetStartPeaks, peak_size * decode.vibration_data.peak_cnt))
-                    console.log(peaks)
 
                     for (let peakIndex = 0; peakIndex < decode.vibration_data.peak_cnt; peakIndex++) {
                         let peak_data = {}
