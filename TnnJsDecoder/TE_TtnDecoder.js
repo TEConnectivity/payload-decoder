@@ -818,6 +818,7 @@ function bitfield(val, offset) {
 }
 
 function dBDecompression(val) {
+    if (val === 0) return 0;
     return Math.pow(10, ((val * 0.3149606) - 49.0298) / 20);
 }
 
