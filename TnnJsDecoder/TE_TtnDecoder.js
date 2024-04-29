@@ -541,7 +541,7 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
 
         // MULTIPOINT
         // 0x1121 should be single axis and 0x1521 should be tri-axis
-        else if ([0x1121, 0x1521].includes(arrayToUint16(bytes, 0, false))) {
+        else if ([0x1121, 0x1521, 0x152f, 0x112f].includes(arrayToUint16(bytes, 0, false))) {
             decode.devtype = {}
             decode.devtype = getDevtype(arrayToUint16(bytes, 0, false));
             decode.cnt = arrayToUint16(bytes, 2, false, false);
@@ -682,6 +682,11 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
             }
 
             return true;
+        }
+
+        // Unknown product
+        else {
+            return false
         }
 
 
