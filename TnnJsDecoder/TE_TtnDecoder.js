@@ -32,6 +32,7 @@ function decodeUplink(input) {
 export function te_decoder(bytes, port) {
     var ttn_output = { data: {} }
     var decode = ttn_output.data
+    decode.size = bytes.length
 
 
     port = parseInt(port)
@@ -690,6 +691,11 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
         }
 
 
+    } else if (port === 138 || port === 202) {
+        decode.val = 'Vibration Multipoint : Fragmented frame NOT SUPPORTED by TTN Live Decoder';
+        decode.port = port;
+        decode.bytes = arrayToString(bytes);
+        return true;
     }
     return false;
 }
@@ -699,7 +705,7 @@ function getDevstat(u8devstat) {
     var DevstatDict = {
         7: "SnsErr",
         6: "CfgErr",
-        5: "MiscErr",
+        5: "CommErr",
         4: "Condition",
         3: "PrelPhase",
         2: "Reserved",
@@ -740,7 +746,8 @@ function getDevtype(u16devtype) {
         1: "g",
         2: "°C",
         3: "Bar",
-        4: "%"
+        4: "%",
+        5: "g",
     }
     var WirelessDict = {
         0: "Error",
