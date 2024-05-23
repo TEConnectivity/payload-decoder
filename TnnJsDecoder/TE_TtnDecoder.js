@@ -30,8 +30,9 @@ function decodeUplink(input) {
  * @returns Decoded object
  */
 export function te_decoder(bytes, port) {
-    var ttn_output = { data: {} }
+    var ttn_output = { data: {}, errors: [] }
     var decode = ttn_output.data
+    var error_dict = ttn_output.errors
     decode.size = bytes.length
 
 
@@ -44,7 +45,7 @@ export function te_decoder(bytes, port) {
             if (Decode8931EX(decode, port, bytes) === false)
                 if (DecodeU8900(decode, port, bytes) === false)
                     if (DecodeU8900Pof(decode, port, bytes) === false)
-                        if (DecodeSinglePointOrMultiPoint(decode, port, bytes) === false)
+                        if (DecodeSinglePointOrMultiPoint(decode, port, bytes, error_dict) === false)
                             if (DecodeTiltSensor(decode, port, bytes) === false)
                                 if (DecodeOperationResponses(decode, port, bytes) === false)
                                     if (DecodeKeepAlive(decode, port, bytes) === false) {
@@ -496,7 +497,7 @@ function DecodeTiltSensor(decode, port, bytes) {
 
     return false;
 }
-function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
+function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
     if (port === 10) {
 
         // Mapping between bw_mode and bin resolution
@@ -562,13 +563,23 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
             if (getBits(bytes[8], 7, 1) === 1)
                 decode.vibration_information.axis.push("z");
             decode.preset_id = bytes[9];
-            decode.bw_mode = bytes[10];
 
+            decode.bw_mode = bytes[10];
+            if (decode.bw_mode > 0x0F) {
+                error.push("BW_Mode must be between 0x00 and 0x0F.")
+                return false;
+            }
+
+            var isSensorErr = decode.devstat.includes("SnsErr")
+            if (isSensorErr) {
+                error.push("Sensor measure is not reliable or is out of range (for more detail see sensor diagnosis).")
+                return false;
+            }
 
             decode.vibration_data = {}
 
             // // DEBUG JEREMY
-            // decode.vibration_information.frame_format = 0
+            //decode.bw_mode = 12
 
             switch (decode.vibration_information.frame_format) {
                 // DATA FORMAT 0
@@ -678,7 +689,6 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes) {
                     }
                     break;
                 default:
-                    decode.vibration_data.warning = "Unknown Vibration Data Frame Format"
                     break;
             }
 
@@ -735,7 +745,7 @@ function getDevtype(u16devtype) {
     }
     var SensorDict = {
         0: "Error",
-        1: "Vibration",
+        1: "Vibration 1-axis",
         2: "Temperature",
         3: "Pressure",
         4: "Humidity",
