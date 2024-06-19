@@ -3,6 +3,8 @@
  * @param {*} input 
  * @returns 
  */
+
+
 // eslint-disable-next-line
 function decodeUplink(input) {
     // input has the following structure:
@@ -638,17 +640,27 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                         // Two first byte of the window
                         window_data.rms_window = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize, 2, false)
 
-                        window_data.peak1_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
-                        window_data.peak1_frequency = window_data.peak1_bin * BW_MODE_RESOLUTION[decode.bw_mode]
-                        window_data.peak1_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 4, 2, false)
+                        let peak1_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
+                        if (peak1_bin !== 0xFFFF) {
+                            window_data.peak1_bin = peak1_bin
+                            window_data.peak1_frequency = window_data.peak1_bin * BW_MODE_RESOLUTION[decode.bw_mode]
+                            window_data.peak1_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 4, 2, false)
+                        }
 
-                        window_data.peak2_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 6, 2, false)
-                        window_data.peak2_frequency = window_data.peak2_bin * BW_MODE_RESOLUTION[decode.bw_mode]
-                        window_data.peak2_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 8, 2, false)
+                        let peak2_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 6, 2, false)
+                        if (peak2_bin !== 0xFFFF) {
 
-                        window_data.peak3_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 10, 2, false)
-                        window_data.peak3_frequency = window_data.peak3_bin * BW_MODE_RESOLUTION[decode.bw_mode]
-                        window_data.peak3_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 12, 2, false)
+                            window_data.peak2_bin = peak2_bin
+                            window_data.peak2_frequency = window_data.peak2_bin * BW_MODE_RESOLUTION[decode.bw_mode]
+                            window_data.peak2_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 8, 2, false)
+                        }
+
+                        let peak3_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 10, 2, false)
+                        if (peak3_bin !== 0xFFFF) {
+                            window_data.peak3_bin = peak3_bin
+                            window_data.peak3_frequency = window_data.peak3_bin * BW_MODE_RESOLUTION[decode.bw_mode]
+                            window_data.peak3_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 12, 2, false)
+                        }
 
                         decode.vibration_data.windows.push(window_data);
 
@@ -669,21 +681,34 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                     /** Les peaks demarrent a partir de cette offset */
                     let offsetStartPeaks = 18
 
-                    // Ce nombre (BigInt) contiens tous les peaks
-                    let peaks = uint8ArrayToBigInt(bytes.slice(offsetStartPeaks, peak_size * decode.vibration_data.peak_cnt))
+                    // Hold the byte containing the peaks
+                    let peaks = bytes.slice(offsetStartPeaks, peak_size * decode.vibration_data.peak_cnt)
+                    // Hold the byte in binary represntation "010101". Use string instead of number because BigInt not widely supported.
+                    let peaks_bitfield = "";
 
+                    peaks.forEach(byte => {
+                        peaks_bitfield += byte.toString(2).padStart(8, '0');
+                    });
+
+                    // Hold the cursor for bit indexing inside peaks
+                    let current_bit_index = 0;
                     for (let peakIndex = 0; peakIndex < decode.vibration_data.peak_cnt; peakIndex++) {
+                        if (current_bit_index + 19 > peaks_bitfield.length) {
+                            // Not enough bits left for another (PEAK_BIN, PEAK_MAGNITUDE) pair
+                            break;
+                        }
+
                         let peak_data = {}
 
                         // Bin index is 11 bit wide
-                        peak_data.bin_index = getBits(peaks, peakIndex * peak_size, 11)
+                        peak_data.bin_index = parseInt(peaks_bitfield.substring(current_bit_index, current_bit_index + 11), 2)
                         peak_data.frequency = peak_data.bin_index * BW_MODE_RESOLUTION[decode.bw_mode]
-
-
+                        current_bit_index += 11;
 
                         // Magnitude is just after, 8 bit wide
-                        peak_data.magnitude_compressed = getBits(peaks, peakIndex * peak_size + 11, 8)
+                        peak_data.magnitude_compressed = parseInt(peaks_bitfield.substring(current_bit_index, current_bit_index + 8), 2);
                         peak_data.magnitude_rms = dBDecompression(peak_data.magnitude_compressed)
+                        current_bit_index += 8;
 
                         decode.vibration_data.peaks.push(peak_data);
                     }
