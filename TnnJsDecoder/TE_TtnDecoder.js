@@ -908,21 +908,5 @@ function getBits(number, index, size) {
     return result;
 }
 
-// Tell linter to exclude BigInt from errors/warning 
-/* global BigInt */
-
-/** Fonction pour convertir un Uint8Array en BigInt
- * 
- * En big endian
- */
-function uint8ArrayToBigInt(uint8Array) {
-    let result = BigInt(0);
-    for (let i = 0; i < uint8Array.length; i++) {
-        result = (result << BigInt(8)) | BigInt(uint8Array[i]);
-    }
-    return result;
-}
-
-
 
 
