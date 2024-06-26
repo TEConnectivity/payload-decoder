@@ -587,34 +587,28 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                 // DATA FORMAT 0
                 case 0:
 
-                    let axisSize = 10
+                    let axisSize = 6
 
 
                     if (decode.vibration_information.axis.includes("x")) {
                         decode.vibration_data.x = {}
-                        decode.vibration_data.x.spectrum_rms = arrayConverter(bytes, 11, 2, false)
+                        decode.vibration_data.x.time_rms = arrayConverter(bytes, 11, 2, false)
                         decode.vibration_data.x.time_p2p = arrayConverter(bytes, 13, 2, false)
-                        decode.vibration_data.x.average = arrayConverter(bytes, 15, 2, false)
-                        decode.vibration_data.x.std = arrayConverter(bytes, 17, 2, false)
-                        decode.vibration_data.x.mid_range = arrayConverter(bytes, 19, 2, false)
+                        decode.vibration_data.x.freq_rms = arrayConverter(bytes, 15, 2, false)
                     }
 
                     if (decode.vibration_information.axis.includes("y")) {
                         decode.vibration_data.y = {}
-                        decode.vibration_data.y.spectrum_rms = arrayConverter(bytes, axisSize + 11, 2, false)
+                        decode.vibration_data.y.time_rms = arrayConverter(bytes, axisSize + 11, 2, false)
                         decode.vibration_data.y.time_p2p = arrayConverter(bytes, axisSize + 13, 2, false)
-                        decode.vibration_data.y.average = arrayConverter(bytes, axisSize + 15, 2, false)
-                        decode.vibration_data.y.std = arrayConverter(bytes, axisSize + 17, 2, false)
-                        decode.vibration_data.y.mid_range = arrayConverter(bytes, axisSize + 19, 2, false)
+                        decode.vibration_data.y.freq_rms = arrayConverter(bytes, axisSize + 15, 2, false)
                     }
 
                     if (decode.vibration_information.axis.includes("z")) {
                         decode.vibration_data.z = {}
-                        decode.vibration_data.z.spectrum_rms = arrayConverter(bytes, 2 * axisSize + 11, 2, false)
+                        decode.vibration_data.z.time_rms = arrayConverter(bytes, 2 * axisSize + 11, 2, false)
                         decode.vibration_data.z.time_p2p = arrayConverter(bytes, 2 * axisSize + 13, 2, false)
-                        decode.vibration_data.z.average = arrayConverter(bytes, 2 * axisSize + 15, 2, false)
-                        decode.vibration_data.z.std = arrayConverter(bytes, 2 * axisSize + 17, 2, false)
-                        decode.vibration_data.z.mid_range = arrayConverter(bytes, 2 * axisSize + 19, 2, false)
+                        decode.vibration_data.z.freq_rms = arrayConverter(bytes, 2 * axisSize + 15, 2, false)
                     }
 
                     break;
