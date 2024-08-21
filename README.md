@@ -4,6 +4,22 @@ This repository hosts the TE Connectivity frame decoder, allowing users to decod
 
 ## Usage
 
+### The Things Network / Industries
+
+Copy paste the content of the [decoder](/TnnJsDecoder/TE_TtnDecoder.js) in your TTN instance : 
+
+![image](https://github.com/user-attachments/assets/b8082379-6dd8-4117-8f70-224ac23f67dc)
+
+
+**When copied-pasted in TTN, the "export" keyword must be deleted in the source code because TTN does not support it !**
+
+### Other LNS
+
+Copy paste the content of the [decoder](/TnnJsDecoder/TE_TtnDecoder.js) in your LNS. 
+
+
+## Developpement
+
 It takes as input the frame in HEX (byteArray) and the lora fPort and returns in JSON a decoded object (loosely follow [TTN output format](https://www.thethingsindustries.com/docs/integrations/payload-formatters/javascript/uplink/)) : 
 
 ```Javascript
@@ -43,7 +59,3 @@ Launch the tester with any HTTP server, like python3 standard module for example
 
 ```python3 -m http.server```
 
-
-## Integration on TTN
-
-The decoding function ```te_decode()``` has the keyword "export" to be integrable with other framework & libraries. When copied-pasted in TTN, this keyword must be deleted because TTN does not support it.
