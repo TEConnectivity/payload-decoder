@@ -64,6 +64,26 @@ export function te_decoder(bytes, port) {
 
 function Decode8931EX(decode, port, bytes) {
     if (port === 5) {
+
+        var BW_MODE_RESOLUTION = {
+            0x00: 0.125,
+            0x01: 0.25,
+            0x02: 0.5,
+            0x03: 1,
+            0x04: 2,
+            0x05: 3,
+            0x06: 4,
+            0x07: 5,
+            0x08: 6,
+            0x09: 7,
+            0x0A: 8,
+            0x0B: 9,
+            0x0C: 10,
+            0x0D: 11,
+            0x0E: 12,
+            0x0F: 13,
+        }
+
         decode.bat = (bytes[1] & 0x0F) === 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
 
         decode.devstat = {};
@@ -94,6 +114,7 @@ function Decode8931EX(decode, port, bytes) {
 
                 var peak = {};
                 peak.Freq = peakVal >> 8;
+                peak.Freq_Hz = peak.Freq * BW_MODE_RESOLUTION[decode.fftInfo.BwMode]
                 peak.Mag = dBDecompression(peakVal & 0xFF);
                 decode.peaksList.push(peak);
                 bitCount = 0;
