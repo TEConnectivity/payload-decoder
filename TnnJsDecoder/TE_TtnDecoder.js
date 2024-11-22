@@ -270,9 +270,9 @@ function DecodeOperationResponses(decode, port, bytes) {
             2: "Write+Read"
         }
         var OperationFlag = {
-            7: "UuidUnk",
-            6: "OpErr",
-            5: "ReadOnly",
+            7: "UuidErr",
+            6: "OpErr/PayloadErr",
+            5: "ReadOnly/WrongOp",
             4: "NetwErr",
 
         }
@@ -302,13 +302,48 @@ function DecodeOperationResponses(decode, port, bytes) {
             case 0x2A29:
                 decode.manuf = arrayToAscii(payload);
                 break;
-            case 0xB302:
+            case 0xCF01: // Sensor Diagnosis
+
+                var SensorDiagFlag = {
+                    7: "TEMP16_OoR_ERR",
+                    4: "TEMP16_CIR_ERR",
+                    3: "SENSOR32_OoR_ERR",
+                    0: "SENSOR32_CIR_ERR",
+
+                }
+                decode.sensor_diagnosis = extract_bitfield(payload[0], SensorDiagFlag)
+
+                break;
+            case 0xCF02: // Comm Diagnosis
+
+                var CommDiagFlag = {
+                    2: "LoRa_Network_Join_Error",
+                    1: "LoRa_Power_Error",
+                    0: "LoRa_Regional_Restriction",
+
+                }
+                decode.comm_diagnosis = extract_bitfield(payload[0], CommDiagFlag)
+
+                break;
+            case 0xCF03: // Battery Diagnosis
+                var BatteryDiagFlag = {
+                    2: "Battery_Warning",
+                    1: "Battery_Low",
+                    0: "Battery_Change",
+
+                }
+                decode.comm_diagnosis = extract_bitfield(payload[0], BatteryDiagFlag)
+                break;
+            case 0xB301: // Meas Counter
+                decode.meas_counter = arrayToInt16(payload, 0, false)
+                break;
+            case 0xB302: // Meas interval
                 decode.measInt = payload[0].toString() + 'h ' + payload[1].toString() + ' min' + payload[2].toString() + ' sec';
                 break;
-            case 0x2A19:
+            case 0x2A19: // Battery
                 decode.batt = payload[0];
                 break;
-            case 0xCE01:
+            case 0xCE01: // Keepalive
                 var KeepAliveInterval = {
                     0: "24h",
                     1: "12h",
@@ -325,7 +360,7 @@ function DecodeOperationResponses(decode, port, bytes) {
                 decode.kaCfg.mode = KeepAliveMode[(payload[0] >> 3) & 0x3];
                 decode.kaCfg.interval = KeepAliveInterval[payload[0] & 0x7];
                 break;
-            case 0xB201:
+            case 0xB201: // Threshold 
                 var ThsSrc = {
                     0: "MainRaw",
                     1: "MainDelta",
@@ -388,7 +423,7 @@ function DecodeOperationResponses(decode, port, bytes) {
                         break;
                 }
                 break;
-            case 0xDB01:
+            case 0xDB01: // Datalog
                 var DataLogDataType = {
                     0: "Temperature",
                     1: "MainData",
@@ -427,13 +462,13 @@ function DecodeOperationResponses(decode, port, bytes) {
                     decode.Datalog.data.push(dataN);
                 }
                 break;
-            case 0xF801:
+            case 0xF801: // DevEUI
                 decode.DevEui = arrayToString(payload);
                 break;
-            case 0xF802:
+            case 0xF802: // AppEUI
                 decode.AppEui = arrayToString(payload);
                 break;
-            case 0xF803:
+            case 0xF803: // Region
                 var RegionType = {
                     0: "AS923",
                     1: "AU915",
@@ -447,7 +482,7 @@ function DecodeOperationResponses(decode, port, bytes) {
                 }
                 decode.Region = RegionType[payload[0] & 0x0F];
                 break;
-            case 0xF804:
+            case 0xF804: // NetID
                 decode.netId = arrayToString(payload);
                 break;
             default:
@@ -520,6 +555,7 @@ function DecodeTiltSensor(decode, port, bytes) {
 
     return false;
 }
+
 function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
     if (port === 10) {
 
@@ -926,4 +962,19 @@ function getBits(number, index, size) {
 }
 
 
-
+/**
+ * Take a byte, a value_dict and return a list of error for each value in the value_dict
+ * @param {byte} byte 
+ * @param {dict} value_dict The key is the bit number, and the value is the error string that should be pushed.
+ * @returns list
+ */
+function extract_bitfield(byte, value_dict) {
+    var list_flag = []
+    for (var i = 7; i >= 0; i--) {
+        if (bitfield(byte, i) === 1) {
+            if (value_dict[i] != null)
+                list_flag.push(value_dict[i]);
+        }
+    }
+    return list_flag
+}
