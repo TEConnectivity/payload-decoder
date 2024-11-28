@@ -11,8 +11,6 @@ Copy paste the content of the [decoder](/TnnJsDecoder/TE_TtnDecoder.js) in your 
 ![image](https://github.com/user-attachments/assets/b8082379-6dd8-4117-8f70-224ac23f67dc)
 
 
-**When copied-pasted in TTN, the "export" keyword must be deleted in the source code because TTN does not support it !**
-
 ### Other LNS
 
 Copy paste the content of the [decoder](/TnnJsDecoder/TE_TtnDecoder.js) in your LNS. 
