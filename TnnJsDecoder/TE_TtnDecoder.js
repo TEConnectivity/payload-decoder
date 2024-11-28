@@ -31,7 +31,7 @@ function decodeUplink(input) {
  * @param {number} port 
  * @returns Decoded object
  */
-export function te_decoder(bytes, port) {
+function te_decoder(bytes, port) {
     var ttn_output = { data: {}, errors: [] }
     var decode = ttn_output.data
     var error_dict = ttn_output.errors
@@ -977,4 +977,11 @@ function extract_bitfield(byte, value_dict) {
         }
     }
     return list_flag
+}
+
+
+
+// For NPM (module exports), so that it is compliant with TTN
+if (typeof exports !== 'undefined') {
+    exports.te_decoder = te_decoder; // CommonJS export for NPM
 }
