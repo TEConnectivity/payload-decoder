@@ -736,13 +736,27 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                     decode.vibration_data.spectrum_rms = arrayConverter(bytes, 11, 2, false)
                     decode.vibration_data.time_p2p = arrayConverter(bytes, 13, 2, false)
                     decode.vibration_data.velocity = arrayConverter(bytes, 15, 2, false)
-                    decode.vibration_data.peak_cnt = bytes[17]
+
+                    decode.vibration_data.window_count = bytes[17]
+
+                    decode.vibration_data.windows_rms = []
+
+                    for (let windowIndex = 0; windowIndex < decode.vibration_data.window_count; windowIndex++) {
+
+                        var window_rms = arrayConverter(bytes, 18 + 2 * windowIndex, 2, false)
+
+                        decode.vibration_data.windows_rms.push(window_rms);
+                    }
+
+
+
+                    decode.vibration_data.peak_cnt = bytes[18 + 2 * decode.vibration_data.window_count]
                     decode.vibration_data.peaks = []
 
                     let peak_size = 19;
 
                     /** Les peaks demarrent a partir de cette offset */
-                    let offsetStartPeaks = 18
+                    let offsetStartPeaks = 19 + 2 * decode.vibration_data.window_count
 
                     let peaks_bitfield = ""
 
@@ -994,4 +1008,9 @@ function extract_bitfield(byte, value_dict) {
 // For NPM (module exports), so that it is compliant with TTN
 if (typeof exports !== 'undefined') {
     exports.te_decoder = te_decoder; // CommonJS export for NPM
+}
+
+// Expose globally for browser usage
+if (typeof window !== 'undefined') {
+    window.te_decoder = te_decoder;
 }

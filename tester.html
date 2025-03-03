@@ -17,7 +17,7 @@ Payload (HEX)</input>
 <script type="module">
 
 
-
+    import "./TnnJsDecoder/TE_TtnDecoder.js"; // Just load it
 
     document.getElementById("button_decode").addEventListener("click", handle_click);
 
@@ -30,7 +30,7 @@ Payload (HEX)</input>
     function handle_click() {
         let input = parseHexString(document.getElementById("input").value.trim().replace(/\s/g, ''));
         let fport = document.getElementById("fport").value
-        let output = syntaxHighlight(te_decoder(input, fport))
+        let output = syntaxHighlight(window.te_decoder(input, fport))
         document.getElementById("output").innerHTML = output
     }
 
