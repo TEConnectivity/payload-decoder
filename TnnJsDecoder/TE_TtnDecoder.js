@@ -48,13 +48,14 @@ function te_decoder(bytes, port) {
                 if (DecodeU8900(decode, port, bytes) === false)
                     if (DecodeU8900Pof(decode, port, bytes) === false)
                         if (DecodeSinglePointOrMultiPoint(decode, port, bytes, error_dict) === false)
-                            if (DecodeTiltSensor(decode, port, bytes) === false)
-                                if (DecodeOperationResponses(decode, port, bytes) === false)
-                                    if (DecodeKeepAlive(decode, port, bytes) === false) {
-                                        decode.val = 'Unknown frame';
-                                        decode.port = port;
-                                        decode.bytes = arrayToString(bytes);
-                                    }
+                            if (DecodeProtocolv2(decode, port, bytes, error_dict) === false)
+                                if (DecodeTiltSensor(decode, port, bytes) === false)
+                                    if (DecodeOperationResponses(decode, port, bytes) === false)
+                                        if (DecodeKeepAlive(decode, port, bytes) === false) {
+                                            decode.val = 'Unknown frame';
+                                            decode.port = port;
+                                            decode.bytes = arrayToString(bytes);
+                                        }
 
     return ttn_output;
 
@@ -804,13 +805,101 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
 
 
     } else if (port === 138 || port === 202) {
-        decode.val = 'Vibration Multipoint : Fragmented frame NOT SUPPORTED by TTN Live Decoder';
+        decode.val = 'Vibration Multipoint : Fragmented frame NOT SUPPORTED by the LNS';
         decode.port = port;
         decode.bytes = arrayToString(bytes);
         return true;
     }
     return false;
 }
+
+
+/**
+ * @param {object} decode
+ * @param {Uint8Array} bytes
+ * @param {number} port
+ * @param {object} error
+ * @returns {boolean}
+ */
+function DecodeProtocolv2(decode, port, bytes, error) {
+    if (port === 21) {
+        
+        // Mapping between bw_mode and bin resolution
+        var BW_MODE_RESOLUTION = {
+            0x00: 0.125,
+            0x01: 0.25,
+            0x02: 0.5,
+            0x03: 1,
+            0x04: 2,
+            0x05: 3,
+            0x06: 4,
+            0x07: 5,
+            0x08: 6,
+            0x09: 7,
+            0x0A: 8,
+            0x0B: 9,
+            0x0C: 10,
+            0x0D: 11,
+            0x0E: 12,
+            0x0F: 13,
+        }
+
+        SensorType = {
+            0x1: "Vibration 1-axis",
+            0x2: "Temperature",
+            0x3: "Pressure",
+            0x4: "Humidity",
+            0x5: "Vibration 3-axis"
+        }
+        FrameType = {
+            0x00: "Downlink response",
+            0x01: "Keep Alive",
+            0x02: "Advertising with measurement counter",
+            0x03: "Advertising with timestamp",
+            0x04: "LoRa single measurement",
+            0x05: "Singlepoint LoRa merged measurement"
+        }
+        decode.info = {}
+        decode.info.protocol_version = getBits(bytes[0],0,4) // Should be 0x02 for protocol v2
+        decode.info.sensortype = SensorType[getBits(bytes[0],4,4)]
+        if (decode.info.sensortype === undefined)
+            return false
+
+        decode.info.frame_type = FrameType[bytes[1]]
+        decode.devstat = getDevstat(bytes[2])
+        decode.bat = bytes[3]
+        
+        payload = bytes.slice(4)
+
+
+        /////////// DownlinkResponse //////////////
+
+
+        /////////// KeepAlive //////////////
+        decode.cnt = arrayToInt16(payload)
+        return true
+
+
+        //////////// Single Measurement ///////////////
+
+
+        // SINGLEPOINT
+
+
+        // VIBRATION
+
+
+
+    } else if (port === 149 || port === 213) {
+        decode.val = 'Vibration Multipoint : Fragmented frame NOT SUPPORTED by the LNS';
+        decode.port = port;
+        decode.bytes = arrayToString(bytes);
+        return true;
+    }
+    return false;
+}
+
+
 function getDevstat(u8devstat) {
     var devstat;
     devstat = [];
@@ -821,7 +910,7 @@ function getDevstat(u8devstat) {
         4: "Condition",
         3: "PrelPhase",
         2: "Reserved",
-        1: "Reserved",
+        1: "TimeErr",
         0: "BattErr"
     }
 
