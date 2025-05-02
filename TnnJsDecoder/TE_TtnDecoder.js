@@ -272,244 +272,237 @@ function DecodeU8900Pof(decode, port, bytes) {
 //port 10  EyEALQhjCgw/gHNj  1321002d08630a0c3f807363    data
 //port 20  AComZGU4ZWFiMTdhZDVm  00 2a 26 64 65 38 65 61 62 31 37 61 64 35 66 fw rev
 //port 30  /EyEARwhj keep alive 132100470863
-function DecodeOperationResponses(decode, port, bytes) {
-    var res = false;
-    if (port === 20) {
-        res = true;
-        var OperationRepsType = {
-            0: "Read",
-            1: "Write",
-            2: "Write+Read"
-        }
-        var OperationFlag = {
-            7: "UuidErr",
-            6: "OpErr/PayloadErr",
-            5: "ReadOnly/WrongOp",
-            4: "NetwErr",
+function DecodeOperationResponses(decode, bytes) {
+    var OperationRepsType = {
+        0: "Read",
+        1: "Write",
+        2: "Write+Read"
+    }
+    var OperationFlag = {
+        7: "UuidErr",
+        6: "OpErr/PayloadErr",
+        5: "ReadOnly/WrongOp",
+        4: "NetwErr",
 
+    }
+    decode.op = OperationRepsType[bytes[0] & 0x3];
+    decode.opFlag = [];
+    for (var i = 7; i > 4; i--) {
+        if (bitfield(bytes[0], i) === 1) {
+            decode.opFlag.push(OperationFlag[i]);
         }
-        decode.op = OperationRepsType[bytes[0] & 0x3];
-        decode.opFlag = [];
-        for (var i = 7; i > 4; i--) {
-            if (bitfield(bytes[0], i) === 1) {
-                decode.opFlag.push(OperationFlag[i]);
+    }
+    var uuid = arrayToUint16(bytes, 1, false)
+    decode.uuid = uuid.toString(16);
+    var payload = bytes.slice(3)
+    switch (uuid) {
+        case 0x2A24:
+            decode.model = arrayToAscii(payload);
+            break;
+        case 0x2A25:
+            decode.sn = arrayToAscii(payload);
+            break;
+        case 0x2A26:
+            decode.fwrev = arrayToAscii(payload);
+            break;
+        case 0x2A27:
+            decode.hwrev = arrayToAscii(payload);
+            break;
+        case 0x2A29:
+            decode.manuf = arrayToAscii(payload);
+            break;
+        case 0xCF01: // Sensor Diagnosis
+
+            var SensorDiagFlag = {
+                7: "TEMP16_OoR_ERR",
+                4: "TEMP16_CIR_ERR",
+                3: "SENSOR32_OoR_ERR",
+                0: "SENSOR32_CIR_ERR",
+
             }
-        }
-        var uuid = arrayToUint16(bytes, 1, false)
-        decode.uuid = uuid.toString(16);
-        var payload = bytes.slice(3)
-        switch (uuid) {
-            case 0x2A24:
-                decode.model = arrayToAscii(payload);
-                break;
-            case 0x2A25:
-                decode.sn = arrayToAscii(payload);
-                break;
-            case 0x2A26:
-                decode.fwrev = arrayToAscii(payload);
-                break;
-            case 0x2A27:
-                decode.hwrev = arrayToAscii(payload);
-                break;
-            case 0x2A29:
-                decode.manuf = arrayToAscii(payload);
-                break;
-            case 0xCF01: // Sensor Diagnosis
+            decode.sensor_diagnosis = extract_bitfield(payload[0], SensorDiagFlag)
 
-                var SensorDiagFlag = {
-                    7: "TEMP16_OoR_ERR",
-                    4: "TEMP16_CIR_ERR",
-                    3: "SENSOR32_OoR_ERR",
-                    0: "SENSOR32_CIR_ERR",
+            break;
+        case 0xCF02: // Comm Diagnosis
 
-                }
-                decode.sensor_diagnosis = extract_bitfield(payload[0], SensorDiagFlag)
+            var CommDiagFlag = {
+                2: "LoRa_Network_Join_Error",
+                1: "LoRa_Power_Error",
+                0: "LoRa_Regional_Restriction",
 
-                break;
-            case 0xCF02: // Comm Diagnosis
+            }
+            decode.comm_diagnosis = extract_bitfield(payload[0], CommDiagFlag)
 
-                var CommDiagFlag = {
-                    2: "LoRa_Network_Join_Error",
-                    1: "LoRa_Power_Error",
-                    0: "LoRa_Regional_Restriction",
+            break;
+        case 0xCF03: // Battery Diagnosis
+            var BatteryDiagFlag = {
+                2: "Battery_Warning",
+                1: "Battery_Low",
+                0: "Battery_Change",
 
-                }
-                decode.comm_diagnosis = extract_bitfield(payload[0], CommDiagFlag)
+            }
+            decode.comm_diagnosis = extract_bitfield(payload[0], BatteryDiagFlag)
+            break;
+        case 0xB301: // Meas Counter
+            decode.meas_counter = arrayToInt16(payload, 0, false)
+            break;
+        case 0xB302: // Meas interval
+            decode.measInt = payload[0].toString() + 'h ' + payload[1].toString() + ' min' + payload[2].toString() + ' sec';
+            break;
+        case 0x2A19: // Battery
+            decode.batt = payload[0];
+            break;
+        case 0xCE01: // Keepalive
+            var KeepAliveInterval = {
+                0: "24h",
+                1: "12h",
+                2: "8h",
+                3: "4h",
+                4: "2h"
+            }
+            var KeepAliveMode = {
+                0: "AnyTime",
+                1: "IfSilent",
+                2: "Disable"
+            }
+            decode.kaCfg = {};
+            decode.kaCfg.mode = KeepAliveMode[(payload[0] >> 3) & 0x3];
+            decode.kaCfg.interval = KeepAliveInterval[payload[0] & 0x7];
+            break;
+        case 0xB201: // Threshold 
+            var ThsSrc = {
+                0: "MainRaw",
+                1: "MainDelta",
+                2: "SecondaryRaw",
+                3: "SecondaryDelta",
+                0xFF: "Error"
+            }
+            var ThsSel = {
+                0: "Config",
+                1: "Level",
+                2: "MeasInterval",
+                3: "ComMode",
+                0xFF: "Error"
+            }
+            decode.ThsCfg = {};
+            decode.ThsCfg.Src = ThsSrc[payload[0]];
+            decode.ThsCfg.Sel = ThsSel[payload[1]];
+            switch (decode.ThsCfg.Sel) {
+                case "Config":
+                    decode.ThsCfg.cfg = {};
+                    decode.ThsCfg.cfg.eventFlag = bitfield(payload[2], 7);
+                    decode.ThsCfg.cfg.enable = bitfield(payload[2], 6);
+                    decode.ThsCfg.cfg.condition = (bitfield(payload[2], 5) === 1) ? '<' : '>';
+                    decode.ThsCfg.cfg.autoclr = bitfield(payload[2], 4);
+                    decode.ThsCfg.cfg.actionMeasIntEn = bitfield(payload[2], 3)
+                    decode.ThsCfg.cfg.actionAdvModeEn = bitfield(payload[2], 2)
+                    decode.ThsCfg.cfg.actionUplModeEn = bitfield(payload[2], 1)
+                    break;
+                case "Level":
+                    decode.ThsCfg.lvl = {};
+                    if (payload.length - 2 >= 4) {
+                        decode.ThsCfg.lvl.valf32 = arrayToFloat(payload, 2, false);
+                        decode.ThsCfg.lvl.vali32 = arrayToInt32(payload, 2, false) / 100.0;
 
-                break;
-            case 0xCF03: // Battery Diagnosis
-                var BatteryDiagFlag = {
-                    2: "Battery_Warning",
-                    1: "Battery_Low",
-                    0: "Battery_Change",
-
-                }
-                decode.comm_diagnosis = extract_bitfield(payload[0], BatteryDiagFlag)
-                break;
-            case 0xB301: // Meas Counter
-                decode.meas_counter = arrayToInt16(payload, 0, false)
-                break;
-            case 0xB302: // Meas interval
-                decode.measInt = payload[0].toString() + 'h ' + payload[1].toString() + ' min' + payload[2].toString() + ' sec';
-                break;
-            case 0x2A19: // Battery
-                decode.batt = payload[0];
-                break;
-            case 0xCE01: // Keepalive
-                var KeepAliveInterval = {
-                    0: "24h",
-                    1: "12h",
-                    2: "8h",
-                    3: "4h",
-                    4: "2h"
-                }
-                var KeepAliveMode = {
-                    0: "AnyTime",
-                    1: "IfSilent",
-                    2: "Disable"
-                }
-                decode.kaCfg = {};
-                decode.kaCfg.mode = KeepAliveMode[(payload[0] >> 3) & 0x3];
-                decode.kaCfg.interval = KeepAliveInterval[payload[0] & 0x7];
-                break;
-            case 0xB201: // Threshold 
-                var ThsSrc = {
-                    0: "MainRaw",
-                    1: "MainDelta",
-                    2: "SecondaryRaw",
-                    3: "SecondaryDelta",
-                    0xFF: "Error"
-                }
-                var ThsSel = {
-                    0: "Config",
-                    1: "Level",
-                    2: "MeasInterval",
-                    3: "ComMode",
-                    0xFF: "Error"
-                }
-                decode.ThsCfg = {};
-                decode.ThsCfg.Src = ThsSrc[payload[0]];
-                decode.ThsCfg.Sel = ThsSel[payload[1]];
-                switch (decode.ThsCfg.Sel) {
-                    case "Config":
-                        decode.ThsCfg.cfg = {};
-                        decode.ThsCfg.cfg.eventFlag = bitfield(payload[2], 7);
-                        decode.ThsCfg.cfg.enable = bitfield(payload[2], 6);
-                        decode.ThsCfg.cfg.condition = (bitfield(payload[2], 5) === 1) ? '<' : '>';
-                        decode.ThsCfg.cfg.autoclr = bitfield(payload[2], 4);
-                        decode.ThsCfg.cfg.actionMeasIntEn = bitfield(payload[2], 3)
-                        decode.ThsCfg.cfg.actionAdvModeEn = bitfield(payload[2], 2)
-                        decode.ThsCfg.cfg.actionUplModeEn = bitfield(payload[2], 1)
-                        break;
-                    case "Level":
-                        decode.ThsCfg.lvl = {};
-                        if (payload.length - 2 >= 4) {
-                            decode.ThsCfg.lvl.valf32 = arrayToFloat(payload, 2, false);
-                            decode.ThsCfg.lvl.vali32 = arrayToInt32(payload, 2, false) / 100.0;
-
-                            decode.ThsCfg.lvl.vali16 = arrayToInt16(payload, 4, false) / 100.0;
-                        }
-                        else {
-                            decode.ThsCfg.lvl.err = "wrong size";
-                        }
-                        break;
-                    case "MeasInterval":
-                        decode.ThsCfg.measInt = payload[2].toString() + 'h ' + payload[3].toString() + ' min' + payload[4].toString() + ' sec';
-                        break;
-                    case "ComMode":
-                        var ThsComBleMode = {
-                            0: "Periodic",
-                            1: "On Measure",
-                            2: "ADV Silent"
-                        }
-                        var ThsComLoraMode = {
-                            0: "On Measurement",
-                            1: "Silent",
-                            2: "Merge"
-                        }
-                        decode.ThsCfg.ComMode = {};
-                        decode.ThsCfg.ComMode.ble = ThsComBleMode[payload[2] & 0x03];
-                        decode.ThsCfg.ComMode.lora = ThsComLoraMode[payload[3] & 0x03];
-                        break;
-                    default:
-                        break;
-                }
-                break;
-            case 0xDB01: // Datalog
-                var DataLogDataType = {
-                    0: "Temperature",
-                    1: "MainData",
-                    2: "Temperature+MainData"
-                }
-                var DataLogDataSize = {
-                    0: 2,
-                    1: 4,
-                    2: 6,
-                }
-                decode.Datalog = {};
-                decode.Datalog.type = DataLogDataType[payload[0]];
-                decode.Datalog.index = arrayToUint16(payload, 1, false);
-                decode.Datalog.length = payload[3];
-                var dataSize = DataLogDataSize[payload[0]];
-                decode.Datalog.data = [];
-                // eslint-disable-next-line
-                for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize * (i + 1) + 4); i++) {
-                    var dataN = {};
-                    dataN.index = decode.Datalog.index + i;
-                    switch (decode.Datalog.type) {
-                        case "Temperature":
-                            dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
-                            break;
-                        case "MainData":
-                            dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4, false) / 100.0;
-                            dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4, false);
-                            break;
-                        case "Temperature+MainData":
-                            dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
-                            dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4 + 2, false) / 100.0;
-                            dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4 + 2, false);
-                            break;
-                        default: break;
+                        decode.ThsCfg.lvl.vali16 = arrayToInt16(payload, 4, false) / 100.0;
                     }
-                    decode.Datalog.data.push(dataN);
+                    else {
+                        decode.ThsCfg.lvl.err = "wrong size";
+                    }
+                    break;
+                case "MeasInterval":
+                    decode.ThsCfg.measInt = payload[2].toString() + 'h ' + payload[3].toString() + ' min' + payload[4].toString() + ' sec';
+                    break;
+                case "ComMode":
+                    var ThsComBleMode = {
+                        0: "Periodic",
+                        1: "On Measure",
+                        2: "ADV Silent"
+                    }
+                    var ThsComLoraMode = {
+                        0: "On Measurement",
+                        1: "Silent",
+                        2: "Merge"
+                    }
+                    decode.ThsCfg.ComMode = {};
+                    decode.ThsCfg.ComMode.ble = ThsComBleMode[payload[2] & 0x03];
+                    decode.ThsCfg.ComMode.lora = ThsComLoraMode[payload[3] & 0x03];
+                    break;
+                default:
+                    break;
+            }
+            break;
+        case 0xDB01: // Datalog
+            var DataLogDataType = {
+                0: "Temperature",
+                1: "MainData",
+                2: "Temperature+MainData"
+            }
+            var DataLogDataSize = {
+                0: 2,
+                1: 4,
+                2: 6,
+            }
+            decode.Datalog = {};
+            decode.Datalog.type = DataLogDataType[payload[0]];
+            decode.Datalog.index = arrayToUint16(payload, 1, false);
+            decode.Datalog.length = payload[3];
+            var dataSize = DataLogDataSize[payload[0]];
+            decode.Datalog.data = [];
+            // eslint-disable-next-line
+            for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize * (i + 1) + 4); i++) {
+                var dataN = {};
+                dataN.index = decode.Datalog.index + i;
+                switch (decode.Datalog.type) {
+                    case "Temperature":
+                        dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
+                        break;
+                    case "MainData":
+                        dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4, false) / 100.0;
+                        dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4, false);
+                        break;
+                    case "Temperature+MainData":
+                        dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
+                        dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4 + 2, false) / 100.0;
+                        dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4 + 2, false);
+                        break;
+                    default: break;
                 }
-                break;
-            case 0xF801: // DevEUI
-                decode.DevEui = arrayToString(payload);
-                break;
-            case 0xF802: // AppEUI
-                decode.AppEui = arrayToString(payload);
-                break;
-            case 0xF803: // Region
-                var RegionType = {
-                    0: "AS923",
-                    1: "AU915",
-                    2: "CN470",
-                    3: "CN779",
-                    4: "EU433",
-                    5: "EU868",
-                    6: "KR920",
-                    7: "IN865",
-                    8: "US915"
-                }
-                decode.Region = RegionType[payload[0] & 0x0F];
-                break;
-            case 0xF804: // NetID
-                decode.netId = arrayToString(payload);
-                break;
-            default:
-                decode.payload = []
-                decode.payload = arrayToString(payload);
+                decode.Datalog.data.push(dataN);
+            }
+            break;
+        case 0xF801: // DevEUI
+            decode.DevEui = arrayToString(payload);
+            break;
+        case 0xF802: // AppEUI
+            decode.AppEui = arrayToString(payload);
+            break;
+        case 0xF803: // Region
+            var RegionType = {
+                0: "AS923",
+                1: "AU915",
+                2: "CN470",
+                3: "CN779",
+                4: "EU433",
+                5: "EU868",
+                6: "KR920",
+                7: "IN865",
+                8: "US915"
+            }
+            decode.Region = RegionType[payload[0] & 0x0F];
+            break;
+        case 0xF804: // NetID
+            decode.netId = arrayToString(payload);
+            break;
+        default:
+            decode.payload = []
+            decode.payload = arrayToString(payload);
 
-                break;
-        }
-
-
+            break;
     }
-    else {
-        res = false;
-    }
-    return res;
+
+
+    return true;
 }
 function DecodeKeepAlive(decode, port, bytes) {
     if (port === 30) {
@@ -569,10 +562,15 @@ function DecodeTiltSensor(decode, port, bytes) {
 }
 
 function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
+    if (port == 20){
+        DecodeOperationResponses(decode,bytes)
+        return true
+    }
+
     if (port === 10) {
 
         // Mapping between bw_mode and bin resolution
-        var BW_MODE_RESOLUTION = {
+        const BW_MODE_RESOLUTION = {
             0x00: 0.125,
             0x01: 0.25,
             0x02: 0.5,
@@ -805,7 +803,7 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
 
 
     } else if (port === 138 || port === 202) {
-        decode.val = 'Vibration Multipoint : Fragmented frame NOT SUPPORTED by the LNS';
+        decode.val = 'Vibration Multipoint : Fragmented frame NOT SUPPORTED by the LNS. Please contact TE Connectivity.';
         decode.port = port;
         decode.bytes = arrayToString(bytes);
         return true;
@@ -825,7 +823,7 @@ function DecodeProtocolv2(decode, port, bytes, error) {
     if (port === 21) {
         
         // Mapping between bw_mode and bin resolution
-        var BW_MODE_RESOLUTION = {
+        const BW_MODE_RESOLUTION = {
             0x00: 0.125,
             0x01: 0.25,
             0x02: 0.5,
@@ -844,14 +842,14 @@ function DecodeProtocolv2(decode, port, bytes, error) {
             0x0F: 13,
         }
 
-        SensorType = {
+        const SensorType = {
             0x1: "Vibration 1-axis",
             0x2: "Temperature",
             0x3: "Pressure",
             0x4: "Humidity",
             0x5: "Vibration 3-axis"
         }
-        FrameType = {
+        const FrameType = {
             0x00: "Downlink response",
             0x01: "Keep Alive",
             0x02: "Advertising with measurement counter",
@@ -859,25 +857,95 @@ function DecodeProtocolv2(decode, port, bytes, error) {
             0x04: "LoRa single measurement",
             0x05: "Singlepoint LoRa merged measurement"
         }
+        // Internal use: invert the map so you can switch on labels or values
+        const FrameCode = {
+            downlink_response: 0x00,
+            keepalive: 0x01,
+            adv_counter: 0x02,
+            adv_timestamp: 0x03,
+            lora_single: 0x04,
+            lora_merged: 0x05
+        };
+
+        const options_lora_single = {
+            0: 'meas_counter',
+            1: 'timestamp',
+            2: 'secondary_temperature',
+            3: 'RFU',
+            4: 'RFU',
+            5: 'RFU',
+            6: 'RFU',
+            7: 'RFU'
+          };
+          
+
+
         decode.info = {}
         decode.info.protocol_version = getBits(bytes[0],0,4) // Should be 0x02 for protocol v2
         decode.info.sensortype = SensorType[getBits(bytes[0],4,4)]
         if (decode.info.sensortype === undefined)
             return false
 
-        decode.info.frame_type = FrameType[bytes[1]]
+        decode.info.frame_type_code = FrameType[bytes[1]]
+        decode.info.frame_type = FrameType[decode.info.frame_type_code];
+
         decode.devstat = getDevstat(bytes[2])
         decode.bat = bytes[3]
         
-        payload = bytes.slice(4)
+        const payload = bytes.slice(4)
+
+        const isSensorErr = decode.devstat.includes("SnsErr")
+        if (isSensorErr) {
+            error.push("Sensor measure is not reliable or is out of range (for more detail see sensor diagnosis).")
+            return false;
+        }
+
+        switch (decode.info.frame_type_code) {
+            case FrameCode.downlink_response: //what should be put here
+                DecodeOperationResponses(decode,payload)
+                return true
+
+            case FrameCode.keepalive:
+                decode.cnt = arrayToInt16(payload)
+                return true
+        
+            case FrameCode.lora_single:
+                const list_options = extract_bitfield(payload[0], options_lora_single)
+                // Offset that move depending on the amount of options in the frame
+                let offset=0
+
+                // Measurement counter
+                if (list_options.includes(options_lora_single[0])){
+                    decode.cnt = arrayToInt16(payload,1)
+                    offset += 2
+                }
+
+                // Timestamp
+                if (list_options.includes(options_lora_single[1])){
+                    const ts32 = arrayToInt32(payload,offset + 1)
+                    const date = new Date(ts32 * 1000);
+                    decode.sensor_timestamp = date.toISOString()
+                    offset += 4
+                }
+
+                // Secondary temperature
+                if (list_options.includes(options_lora_single[2])){
+                    decode.temperature = arrayToInt16(payload,offset + 1) / 100
+                    offset += 2
+                }
 
 
-        /////////// DownlinkResponse //////////////
+                const meas_data = payload.slice(offset + 1)
 
 
-        /////////// KeepAlive //////////////
-        decode.cnt = arrayToInt16(payload)
-        return true
+
+
+            default:
+                decode.val = 'This frame type is unknown. Please contact TE with and provide the current JSON.';
+                decode.port = port;
+                decode.bytes = arrayToString(bytes);
+                break;
+        }
 
 
         //////////// Single Measurement ///////////////
@@ -891,7 +959,7 @@ function DecodeProtocolv2(decode, port, bytes, error) {
 
 
     } else if (port === 149 || port === 213) {
-        decode.val = 'Vibration Multipoint : Fragmented frame NOT SUPPORTED by the LNS';
+        decode.val = 'Vibration Multipoint : Fragmented frame NOT SUPPORTED by the LNS. Please contact TE Connectivity.';
         decode.port = port;
         decode.bytes = arrayToString(bytes);
         return true;
@@ -1077,6 +1145,8 @@ function getBits(number, index, size) {
 
 /**
  * Take a byte, a value_dict and return a list of error for each value in the value_dict
+ * 
+ * Useful to parse bitmap/bitfield.
  * @param {byte} byte 
  * @param {dict} value_dict The key is the bit number, and the value is the error string that should be pushed.
  * @returns list
