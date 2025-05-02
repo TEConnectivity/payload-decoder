@@ -637,7 +637,6 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
 
             decode.vibration_data = {}
 
-            // // DEBUG JEREMY
 
             switch (decode.vibration_information.frame_format) {
                 // DATA FORMAT 0
@@ -734,14 +733,14 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                     /** Les peaks demarrent a partir de cette offset */
                     let offsetStartPeaks = 18
 
-                    // Hold the byte containing the peaks
-                    let peaks = bytes.slice(offsetStartPeaks, peak_size * decode.vibration_data.peak_cnt)
-                    // Hold the byte in binary represntation "010101". Use string instead of number because BigInt not widely supported.
-                    let peaks_bitfield = "";
+                    let peaks_bitfield = ""
 
-                    peaks.forEach(byte => {
+                    // Where to stop looking for peak
+                    const binary_limit = Math.ceil((decode.vibration_data.peak_cnt * peak_size) / 8)
+                    for (let i = 0; i < binary_limit; i++) {
+                        let byte = bytes[offsetStartPeaks + i];
                         peaks_bitfield += byte.toString(2).padStart(8, '0');
-                    });
+                    }
 
                     // Hold the cursor for bit indexing inside peaks
                     let current_bit_index = 0;
