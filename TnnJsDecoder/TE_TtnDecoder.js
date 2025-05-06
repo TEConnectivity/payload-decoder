@@ -50,7 +50,6 @@ function te_decoder(bytes, port) {
                         if (DecodeSinglePointOrMultiPoint(decode, port, bytes, error_dict) === false)
                             if (DecodeProtocolv2(decode, port, bytes, error_dict) === false)
                                 if (DecodeTiltSensor(decode, port, bytes) === false)
-                                    if (DecodeOperationResponses(decode, port, bytes) === false)
                                         if (DecodeKeepAlive(decode, port, bytes) === false) {
                                             decode.val = 'Unknown frame';
                                             decode.port = port;
@@ -889,15 +888,18 @@ function DecodeProtocolv2(decode, port, bytes, error) {
         decode.info = {}
         decode.info.protocol_version = getBits(bytes[0],0,4) // Should be 0x02 for protocol v2
         decode.info.sensortype = SensorType[getBits(bytes[0],4,4)]
-        if (decode.info.sensortype === undefined)
+        if (decode.info.sensortype === undefined){
+            error.push("This sensor type is not supported. Please contact TE.");
             return false
-
-        decode.info.frame_type_code = FrameType[bytes[1]]
+        }
+        decode.info.frame_type_code = bytes[1]
         decode.info.frame_type = FrameType[decode.info.frame_type_code];
+
+
 
         decode.devstat = getDevstat(bytes[2])
         decode.bat = bytes[3]
-        
+
         const payload = bytes.slice(4)
 
         const isSensorErr = decode.devstat.includes("SnsErr")
@@ -905,6 +907,7 @@ function DecodeProtocolv2(decode, port, bytes, error) {
             error.push("Sensor measure is not reliable or is out of range (for more detail see sensor diagnosis).")
             return false;
         }
+
 
         switch (decode.info.frame_type_code) {
             case FrameCode.downlink_response: //what should be put here
@@ -928,7 +931,7 @@ function DecodeProtocolv2(decode, port, bytes, error) {
 
                 // Timestamp
                 if (list_options.includes(options_lora_single[1])){
-                    const ts32 = arrayToInt32(payload,offset + 1)
+                    const ts32 = arrayConverter(payload,offset + 1,4, false, false)
                     const date = new Date(ts32 * 1000);
                     decode.sensor_timestamp = date.toISOString()
                     offset += 4
@@ -1107,6 +1110,8 @@ function DecodeProtocolv2(decode, port, bytes, error) {
                         break;
                 }
 
+                return true
+
 
 
             default:
@@ -1221,6 +1226,12 @@ function arrayToUint16(arr, offset, littleEndian = true) {
 function arrayToInt32(arr, offset, littleEndian = true) {
     return (arrayConverter(arr, offset, 4, littleEndian, true));
 }
+
+function arrayToUInt32(arr, offset, littleEndian = true) {
+    return (arrayConverter(arr, offset, 4, littleEndian, false));
+}
+
+
 function arrayToInt16(arr, offset, littleEndian = true) {
     return (arrayConverter(arr, offset, 2, littleEndian, true));
 }
