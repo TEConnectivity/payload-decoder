@@ -647,7 +647,10 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
 
             decode.vibration_data = {}
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> ad150c2 (added lora single_measurement in protocol v2)
             switch (decode.vibration_information.frame_format) {
                 // DATA FORMAT 0
                 case 0:
@@ -660,7 +663,6 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                         decode.vibration_data.x = {}
                         decode.vibration_data.x.time_rms = arrayConverter(bytes, 11, 2, false)
                         decode.vibration_data.x.time_p2p = arrayConverter(bytes, 13, 2, false)
-                        decode.vibration_data.x.freq_rms = arrayConverter(bytes, 15, 2, false)
                         offset += 1
                     }
 
@@ -668,7 +670,6 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                         decode.vibration_data.y = {}
                         decode.vibration_data.y.time_rms = arrayConverter(bytes, offset * axisSize + 11, 2, false)
                         decode.vibration_data.y.time_p2p = arrayConverter(bytes, offset * axisSize + 13, 2, false)
-                        decode.vibration_data.y.freq_rms = arrayConverter(bytes, offset * axisSize + 15, 2, false)
                         offset += 1
                     }
 
@@ -676,7 +677,6 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                         decode.vibration_data.z = {}
                         decode.vibration_data.z.time_rms = arrayConverter(bytes, offset * axisSize + 11, 2, false)
                         decode.vibration_data.z.time_p2p = arrayConverter(bytes, offset * axisSize + 13, 2, false)
-                        decode.vibration_data.z.freq_rms = arrayConverter(bytes, offset * axisSize + 15, 2, false)
                     }
 
                     break;
@@ -700,7 +700,13 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                     for (let windowIndex = 0; windowIndex < windowsNumber; windowIndex++) {
                         let window_data = {}
                         // Two first byte of the window
-                        window_data.rms_window = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize, 2, false)
+                        
+                        
+                        let winRMS = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize, 2, false)
+                        if (winRMS === 0xFFFF){
+                            window_data.disabled = true
+                        }else
+                            window_data.rms_window = winRMS;
 
                         let peak1_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
                         if (peak1_bin !== 0xFFFF) {
@@ -857,7 +863,7 @@ function DecodeProtocolv2(decode, port, bytes, error) {
             0x04: "LoRa single measurement",
             0x05: "Singlepoint LoRa merged measurement"
         }
-        // Internal use: invert the map so you can switch on labels or values
+        // Internal use: invert the map so we can switch on labels or values
         const FrameCode = {
             downlink_response: 0x00,
             keepalive: 0x01,
@@ -934,9 +940,172 @@ function DecodeProtocolv2(decode, port, bytes, error) {
                     offset += 2
                 }
 
-
                 const meas_data = payload.slice(offset + 1)
 
+
+                decode.vibration_information = {}
+                decode.vibration_information.frame_format = getBits(meas_data[0], 0, 2)
+                decode.vibration_information.rotating_mode = getBits(meas_data[0], 4, 1)
+                decode.vibration_information.axis = []
+                if (getBits(meas_data[0], 5, 1) === 1)
+                    decode.vibration_information.axis.push("x");
+                if (getBits(meas_data[0], 6, 1) === 1)
+                    decode.vibration_information.axis.push("y");
+                if (getBits(meas_data[0], 7, 1) === 1)
+                    decode.vibration_information.axis.push("z");
+                decode.preset_id = meas_data[1];
+                decode.bw_mode = meas_data[2];
+
+                let vib_raw_data = meas_data.slice(3)
+                decode.vibration_data = {}
+
+                
+                switch (decode.vibration_information.frame_format) {
+                    // DATA FORMAT 0, with 2bytes as RFU
+                    case 0:
+
+                        var axisSize = 6
+                        // Offset to keep track if an axis existed or not, axis should always come X then Y then Z
+                        let offset = 0
+
+                        if (decode.vibration_information.axis.includes("x")) {
+                            decode.vibration_data.x = {}
+                            decode.vibration_data.x.time_rms = arrayConverter(vib_raw_data, 0, 2, false)
+                            decode.vibration_data.x.time_p2p = arrayConverter(vib_raw_data, 2, 2, false)
+                            offset += 1
+                        }
+
+                        if (decode.vibration_information.axis.includes("y")) {
+                            decode.vibration_data.y = {}
+                            decode.vibration_data.y.time_rms = arrayConverter(vib_raw_data, offset * axisSize + 0, 2, false)
+                            decode.vibration_data.y.time_p2p = arrayConverter(vib_raw_data, offset * axisSize + 2, 2, false)
+                            offset += 1
+                        }
+
+                        if (decode.vibration_information.axis.includes("z")) {
+                            decode.vibration_data.z = {}
+                            decode.vibration_data.z.time_rms = arrayConverter(vib_raw_data, offset * axisSize + 0, 2, false)
+                            decode.vibration_data.z.time_p2p = arrayConverter(vib_raw_data, offset * axisSize + 2, 2, false)
+                        }
+
+                        break;
+
+                    // DATA FORMAT 1 is the default one, because it the format selected in the default preset ID 0
+                    case 1:
+                        decode.vibration_data.spectrum_rms = arrayConverter(vib_raw_data, 0, 2, false)
+                        decode.vibration_data.time_p2p = arrayConverter(vib_raw_data, 2, 2, false)
+                        decode.vibration_data.velocity = arrayConverter(vib_raw_data, 4, 2, false)
+                        decode.vibration_data.windows = []
+
+                        let windowSize = 14
+                        // Les fenetre demarrent a partir de cette offset
+                        let offsetStartWindows = 6
+
+                        // On enleve tous les bytes de header, on enleve la derniere fenetre si elle est fragmente
+                        let windowsNumber = Math.floor((vib_raw_data.length - offsetStartWindows) / windowSize)
+
+
+                        // Parcours de toutes les fenetres, par defaut il y en a 8 en preset ID 0 
+                        for (let windowIndex = 0; windowIndex < windowsNumber; windowIndex++) {
+                            let window_data = {}
+
+                            // Two first byte of the window
+                            let winRMS  = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize, 2, false)
+                            if (winRMS === 0xFFFF){
+                                window_data.disabled = true
+                            }else
+                                window_data.rms_window = winRMS;
+
+                            let peak1_bin = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
+                            if (peak1_bin !== 0xFFFF) {
+                                window_data.peak1_bin = peak1_bin
+                                window_data.peak1_frequency = window_data.peak1_bin * BW_MODE_RESOLUTION[decode.bw_mode]
+                                window_data.peak1_rms = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 4, 2, false)
+                            }
+
+                            let peak2_bin = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 6, 2, false)
+                            if (peak2_bin !== 0xFFFF) {
+
+                                window_data.peak2_bin = peak2_bin
+                                window_data.peak2_frequency = window_data.peak2_bin * BW_MODE_RESOLUTION[decode.bw_mode]
+                                window_data.peak2_rms = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 8, 2, false)
+                            }
+
+                            let peak3_bin = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 10, 2, false)
+                            if (peak3_bin !== 0xFFFF) {
+                                window_data.peak3_bin = peak3_bin
+                                window_data.peak3_frequency = window_data.peak3_bin * BW_MODE_RESOLUTION[decode.bw_mode]
+                                window_data.peak3_rms = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 12, 2, false)
+                            }
+
+                            decode.vibration_data.windows.push(window_data);
+
+                        }
+
+                        break;
+
+                    // DATA FORMAT 2
+                    case 2:
+                        decode.vibration_data.spectrum_rms = arrayConverter(vib_raw_data, 0, 2, false)
+                        decode.vibration_data.time_p2p = arrayConverter(vib_raw_data, 2, 2, false)
+                        decode.vibration_data.velocity = arrayConverter(vib_raw_data, 4, 2, false)
+
+                        decode.vibration_data.window_count = vib_raw_data[6]
+
+                        decode.vibration_data.windows_rms = []
+
+                        for (let windowIndex = 0; windowIndex < decode.vibration_data.window_count; windowIndex++) {
+
+                            var window_rms = arrayConverter(vib_raw_data, 7 + 2 * windowIndex, 2, false)
+
+                            decode.vibration_data.windows_rms.push(window_rms);
+                        }
+
+
+                        decode.vibration_data.peak_cnt = vib_raw_data[7 + 2 * decode.vibration_data.window_count]
+                        decode.vibration_data.peaks = []
+
+                        let peak_size = 19;
+
+                        /** Les peaks demarrent a partir de cet offset (bytes) */
+                        let offsetStartPeaks = 8 + 2 * decode.vibration_data.window_count
+
+                        // Hold the byte containing the peaks
+                        let peaks = vib_raw_data.slice(offsetStartPeaks, peak_size * decode.vibration_data.peak_cnt)
+                        // Hold the byte in binary represntation "010101". Use string instead of number because BigInt not widely supported.
+                        let peaks_bitfield = "";
+
+                        peaks.forEach(byte => {
+                            peaks_bitfield += byte.toString(2).padStart(8, '0');
+                        });
+
+                        // Hold the cursor for bit indexing inside peaks
+                        let current_bit_index = 0;
+                        for (let peakIndex = 0; peakIndex < decode.vibration_data.peak_cnt; peakIndex++) {
+                            if (current_bit_index + 19 > peaks_bitfield.length) {
+                                // Not enough bits left for another (PEAK_BIN, PEAK_MAGNITUDE) pair
+                                break;
+                            }
+
+                            let peak_data = {}
+
+                            // Bin index is 11 bit wide
+                            peak_data.bin_index = parseInt(peaks_bitfield.substring(current_bit_index, current_bit_index + 11), 2)
+                            peak_data.frequency = peak_data.bin_index * BW_MODE_RESOLUTION[decode.bw_mode]
+                            current_bit_index += 11;
+
+                            // Magnitude is just after, 8 bit wide
+                            peak_data.magnitude_compressed = parseInt(peaks_bitfield.substring(current_bit_index, current_bit_index + 8), 2);
+                            peak_data.magnitude_rms = dBDecompression(peak_data.magnitude_compressed)
+                            current_bit_index += 8;
+
+                            decode.vibration_data.peaks.push(peak_data);
+                        }
+                        break;
+                    
+                    default:
+                        break;
+                }
 
 
 
@@ -947,14 +1116,6 @@ function DecodeProtocolv2(decode, port, bytes, error) {
                 break;
         }
 
-
-        //////////// Single Measurement ///////////////
-
-
-        // SINGLEPOINT
-
-
-        // VIBRATION
 
 
 
