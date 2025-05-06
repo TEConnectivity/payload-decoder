@@ -925,7 +925,7 @@ function DecodeProtocolv2(decode, port, bytes, error) {
 
                 // Measurement counter
                 if (list_options.includes(options_lora_single[0])){
-                    decode.cnt = arrayToInt16(payload,1)
+                    decode.cnt = arrayToUint16(payload,1, false)
                     offset += 2
                 }
 
@@ -939,7 +939,7 @@ function DecodeProtocolv2(decode, port, bytes, error) {
 
                 // Secondary temperature
                 if (list_options.includes(options_lora_single[2])){
-                    decode.temperature = arrayToInt16(payload,offset + 1) / 100
+                    decode.temperature = arrayConverter(payload,offset + 1, 2,false, true) / 100
                     offset += 2
                 }
 
