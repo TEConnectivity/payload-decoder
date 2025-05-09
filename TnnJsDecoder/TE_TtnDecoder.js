@@ -493,6 +493,13 @@ function DecodeOperationResponses(decode, bytes) {
         case 0xF804: // NetID
             decode.netId = arrayToString(payload);
             break;
+        case 0xAA01: // Protocol Version
+            decode.protocol_version = payload[0]
+            break;
+        case 0xDA04: // Measurement Timestamp
+            const ts32 = arrayConverter(payload,0,3, false, false)
+            const date = new Date(ts32 * 1000);
+            decode.sensor_timestamp = date.toISOString()
         default:
             decode.payload = []
             decode.payload = arrayToString(payload);
