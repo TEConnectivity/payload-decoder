@@ -168,14 +168,25 @@ function Decode8911EX(decode, port, bytes) {
             decode.devstat.battery = (bitfield(bytes[7], 0) === 0) ? 'ok' : 'err';
         }
         decode.peaks = [];
-        for (var i = 0; i < decode.peak_nb && ((i * 5 + 5) < (bytes.length - 8)); i++) {
-            var peak = {};
-            peak.freq = arrayConverter(bytes, 5 * i + 8, 2);
-            peak.mag = round(arrayConverter(bytes, ((i * 5) + 10), 2) / 1000.0, 3);
-            peak.ratio = bytes[i * 5 + 12];
-            decode.peaks.push(peak);
+        var peaks_start_index = 8;
+        var bytes_per_peak = 5;
+        for (var i = 0; i < decode.peak_nb; i++) {
+            var peak_start = peaks_start_index + (i * bytes_per_peak);
+            var peak_end = peak_start + bytes_per_peak - 1;
 
-        } return true;
+            // Check if we have enough bytes for this complete peak
+            if (peak_end >= bytes.length) {
+                break;
+            }
+
+            var peak = {};
+            peak.freq = arrayConverter(bytes, peak_start, 2);
+            peak.mag = round(arrayConverter(bytes, peak_start + 2, 2) / 1000.0, 3);
+            peak.ratio = bytes[peak_start + 4];
+            decode.peaks.push(peak);
+        }
+
+        return true;
     }
     else if (port === 129 || port === 193) {
         // 129 start fragment, 193 end fragment
