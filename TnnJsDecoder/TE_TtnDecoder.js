@@ -50,11 +50,11 @@ function te_decoder(bytes, port) {
                         if (DecodeSinglePointOrMultiPoint(decode, port, bytes, error_dict) === false)
                             if (DecodeProtocolv2(decode, port, bytes, error_dict) === false)
                                 if (DecodeTiltSensor(decode, port, bytes) === false)
-                                        if (DecodeKeepAlive(decode, port, bytes) === false) {
-                                            decode.val = 'Unknown frame';
-                                            decode.port = port;
-                                            decode.bytes = arrayToString(bytes);
-                                        }
+                                    if (DecodeKeepAlive(decode, port, bytes) === false) {
+                                        decode.val = 'Unknown frame';
+                                        decode.port = port;
+                                        decode.bytes = arrayToString(bytes);
+                                    }
 
     return ttn_output;
 
@@ -497,7 +497,7 @@ function DecodeOperationResponses(decode, bytes) {
             decode.protocol_version = payload[0]
             break;
         case 0xDA04: // Measurement Timestamp
-            const ts32 = arrayConverter(payload,0,3, false, false)
+            const ts32 = arrayConverter(payload, 0, 3, false, false)
             const date = new Date(ts32 * 1000);
             decode.sensor_timestamp = date.toISOString()
         default:
@@ -568,8 +568,8 @@ function DecodeTiltSensor(decode, port, bytes) {
 }
 
 function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
-    if (port == 20){
-        DecodeOperationResponses(decode,bytes)
+    if (port == 20) {
+        DecodeOperationResponses(decode, bytes)
         return true
     }
 
@@ -653,10 +653,6 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
 
             decode.vibration_data = {}
 
-<<<<<<< HEAD
-
-=======
->>>>>>> ad150c2 (added lora single_measurement in protocol v2)
             switch (decode.vibration_information.frame_format) {
                 // DATA FORMAT 0
                 case 0:
@@ -706,12 +702,12 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                     for (let windowIndex = 0; windowIndex < windowsNumber; windowIndex++) {
                         let window_data = {}
                         // Two first byte of the window
-                        
-                        
+
+
                         let winRMS = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize, 2, false)
-                        if (winRMS === 0xFFFF){
+                        if (winRMS === 0xFFFF) {
                             window_data.disabled = true
-                        }else
+                        } else
                             window_data.rms_window = winRMS;
 
                         let peak1_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
@@ -833,7 +829,7 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
  */
 function DecodeProtocolv2(decode, port, bytes, error) {
     if (port === 21) {
-        
+
         // Mapping between bw_mode and bin resolution
         const BW_MODE_RESOLUTION = {
             0x00: 0.125,
@@ -888,14 +884,14 @@ function DecodeProtocolv2(decode, port, bytes, error) {
             5: 'RFU',
             6: 'RFU',
             7: 'RFU'
-          };
-          
+        };
+
 
 
         decode.info = {}
-        decode.info.protocol_version = getBits(bytes[0],0,4) // Should be 0x02 for protocol v2
-        decode.info.sensortype = SensorType[getBits(bytes[0],4,4)]
-        if (decode.info.sensortype === undefined){
+        decode.info.protocol_version = getBits(bytes[0], 0, 4) // Should be 0x02 for protocol v2
+        decode.info.sensortype = SensorType[getBits(bytes[0], 4, 4)]
+        if (decode.info.sensortype === undefined) {
             error.push("This sensor type is not supported. Please contact TE.");
             return false
         }
@@ -918,35 +914,35 @@ function DecodeProtocolv2(decode, port, bytes, error) {
 
         switch (decode.info.frame_type_code) {
             case FrameCode.downlink_response: //what should be put here
-                DecodeOperationResponses(decode,payload)
+                DecodeOperationResponses(decode, payload)
                 return true
 
             case FrameCode.keepalive:
                 decode.cnt = arrayToInt16(payload)
                 return true
-        
+
             case FrameCode.lora_single:
                 const list_options = extract_bitfield(payload[0], options_lora_single)
                 // Offset that move depending on the amount of options in the frame
-                let offset=0
+                let offset = 0
 
                 // Measurement counter
-                if (list_options.includes(options_lora_single[0])){
-                    decode.cnt = arrayToUint16(payload,1, false)
+                if (list_options.includes(options_lora_single[0])) {
+                    decode.cnt = arrayToUint16(payload, 1, false)
                     offset += 2
                 }
 
                 // Timestamp
-                if (list_options.includes(options_lora_single[1])){
-                    const ts32 = arrayConverter(payload,offset + 1,4, false, false)
+                if (list_options.includes(options_lora_single[1])) {
+                    const ts32 = arrayConverter(payload, offset + 1, 4, false, false)
                     const date = new Date(ts32 * 1000);
                     decode.sensor_timestamp = date.toISOString()
                     offset += 4
                 }
 
                 // Secondary temperature
-                if (list_options.includes(options_lora_single[2])){
-                    decode.temperature = arrayConverter(payload,offset + 1, 2,false, true) / 100
+                if (list_options.includes(options_lora_single[2])) {
+                    decode.temperature = arrayConverter(payload, offset + 1, 2, false, true) / 100
                     offset += 2
                 }
 
@@ -969,7 +965,7 @@ function DecodeProtocolv2(decode, port, bytes, error) {
                 let vib_raw_data = meas_data.slice(3)
                 decode.vibration_data = {}
 
-                
+
                 switch (decode.vibration_information.frame_format) {
                     // DATA FORMAT 0, with 2bytes as RFU
                     case 0:
@@ -1020,10 +1016,10 @@ function DecodeProtocolv2(decode, port, bytes, error) {
                             let window_data = {}
 
                             // Two first byte of the window
-                            let winRMS  = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize, 2, false)
-                            if (winRMS === 0xFFFF){
+                            let winRMS = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize, 2, false)
+                            if (winRMS === 0xFFFF) {
                                 window_data.disabled = true
-                            }else
+                            } else
                                 window_data.rms_window = winRMS;
 
                             let peak1_bin = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
@@ -1112,7 +1108,7 @@ function DecodeProtocolv2(decode, port, bytes, error) {
                             decode.vibration_data.peaks.push(peak_data);
                         }
                         break;
-                    
+
                     default:
                         break;
                 }
