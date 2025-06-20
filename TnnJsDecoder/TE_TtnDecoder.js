@@ -623,7 +623,7 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
             decode.temp = (arrayConverter(bytes, 6, 2, false, true) / 100.0).toString();
 
             decode.vibration_information = {}
-            decode.vibration_information.frame_format = getBits(bytes[8], 0, 2)
+            decode.vibration_information.vibration_data_format = getBits(bytes[8], 0, 2)
             decode.vibration_information.rotating_mode = getBits(bytes[8], 4, 1)
             decode.vibration_information.axis = []
             if (getBits(bytes[8], 5, 1) === 1)
@@ -649,7 +649,7 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
             decode.vibration_data = {}
 
 
-            switch (decode.vibration_information.frame_format) {
+            switch (decode.vibration_information.vibration_data_format) {
                 // DATA FORMAT 0
                 case 0:
 
