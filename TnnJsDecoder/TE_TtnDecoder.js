@@ -313,6 +313,9 @@ function DecodeOperationResponses(decode, port, bytes) {
             case 0x2A29:
                 decode.manuf = arrayToAscii(payload);
                 break;
+            // case 0xFC01: // Device Status
+            //     getDevstat(payload);
+            //     break;
             case 0xCF01: // Sensor Diagnosis
 
                 var SensorDiagFlag = {
@@ -394,7 +397,7 @@ function DecodeOperationResponses(decode, port, bytes) {
                         decode.ThsCfg.cfg = {};
                         decode.ThsCfg.cfg.eventFlag = bitfield(payload[2], 7);
                         decode.ThsCfg.cfg.enable = bitfield(payload[2], 6);
-                        decode.ThsCfg.cfg.condition = (bitfield(payload[2], 5) === 1) ? '<' : '>';
+                        decode.ThsCfg.cfg.condition = (bitfield(payload[2], 5) === 1) ? 'above (data>level)' : 'below (data<level)';
                         decode.ThsCfg.cfg.autoclr = bitfield(payload[2], 4);
                         decode.ThsCfg.cfg.actionMeasIntEn = bitfield(payload[2], 3)
                         decode.ThsCfg.cfg.actionAdvModeEn = bitfield(payload[2], 2)
@@ -804,7 +807,7 @@ function getDevstat(u8devstat) {
         7: "SnsErr",
         6: "CfgErr",
         5: "CommErr",
-        4: "Condition",
+        4: "ThsTriggered",
         3: "PrelPhase",
         2: "Reserved",
         1: "Reserved",
