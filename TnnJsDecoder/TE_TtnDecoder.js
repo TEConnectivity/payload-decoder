@@ -87,9 +87,9 @@ function Decode8931EX(decode, port, bytes) {
         decode.bat = (bytes[1] & 0x0F) === 0xF ? 'err' : (((bytes[1] & 0x0F) * 10) + '%');
 
         decode.devstat = {};
-        decode.devstat.rotEn = (bitfield(bytes[1], 7) === 1) ? 'enabled' : 'disabled';
+        decode.devstat.rotEn = (bitfield(bytes[1], 4) === 1) ? 'enabled' : 'disabled';
         decode.devstat.temp = (bitfield(bytes[1], 6) === 0) ? 'ok' : 'err';
-        decode.devstat.acc = (bitfield(bytes[1], 5) === 0) ? 'ok' : 'err';
+        decode.devstat.acc = (bitfield(bytes[1], 7) === 0) ? 'ok' : 'err';
 
 
         decode.presetId = bytes[0];
