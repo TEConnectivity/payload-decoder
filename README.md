@@ -1,4 +1,4 @@
-# TTN Payload Formater
+# Payload Decoder
 
 This repository hosts the TE Connectivity frame decoder, allowing users to decode uplink frames coming from the sensors.
 
