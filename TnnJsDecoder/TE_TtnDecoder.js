@@ -438,44 +438,68 @@ function DecodeOperationResponses(decode, port, bytes) {
                 }
                 break;
             case 0xDB01: // Datalog
-                var DataLogDataType = {
-                    0: "Temperature",
-                    1: "MainData",
-                    2: "Temperature+MainData"
-                }
-                var DataLogDataSize = {
-                    0: 2,
-                    1: 4,
-                    2: 6,
-                }
-                decode.Datalog = {};
-                decode.Datalog.type = DataLogDataType[payload[0]];
-                decode.Datalog.index = arrayToUint16(payload, 1, false);
-                decode.Datalog.length = payload[3];
-                var dataSize = DataLogDataSize[payload[0]];
-                decode.Datalog.data = [];
-                // eslint-disable-next-line
-                for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize * (i + 1) + 4); i++) {
-                    var dataN = {};
-                    dataN.index = decode.Datalog.index + i;
-                    switch (decode.Datalog.type) {
-                        case "Temperature":
-                            dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
-                            break;
-                        case "MainData":
-                            dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4, false) / 100.0;
-                            dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4, false);
-                            break;
-                        case "Temperature+MainData":
-                            dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
-                            dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4 + 2, false) / 100.0;
-                            dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4 + 2, false);
-                            break;
-                        default: break;
+                {
+                    var DataLogDataType = {
+                        0: "Temperature",
+                        1: "MainData",
+                        2: "Temperature+MainData"
                     }
-                    decode.Datalog.data.push(dataN);
+                    var DataLogDataSize = {
+                        0: 2,
+                        1: 4,
+                        2: 6,
+                    }
+                    decode.Datalog = {};
+                    decode.Datalog.type = DataLogDataType[payload[0]];
+                    decode.Datalog.index = arrayToUint16(payload, 1, false);
+                    decode.Datalog.length = payload[3];
+                    let dataSize = DataLogDataSize[payload[0]];
+                    decode.Datalog.data = [];
+                    // eslint-disable-next-line
+                    for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize * (i + 1) + 4); i++) {
+                        var dataN = {};
+                        dataN.index = decode.Datalog.index + i;
+                        switch (decode.Datalog.type) {
+                            case "Temperature":
+                                dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
+                                break;
+                            case "MainData":
+                                dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4, false) / 100.0;
+                                dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4, false);
+                                break;
+                            case "Temperature+MainData":
+                                dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
+                                dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4 + 2, false) / 100.0;
+                                dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4 + 2, false);
+                                break;
+                            default: break;
+                        }
+                        decode.Datalog.data.push(dataN);
+                    }
+                    break;
                 }
-                break;
+            case 0xDA03: // Vibration Raw Data
+                {
+                    var Axis = {
+                        1: "Z",
+                        2: "Y",
+                        4: "X"
+                    }
+                    decode.RawData = {};
+                    decode.RawData.axis = Axis[payload[0]];
+                    decode.RawData.index = arrayToUint16(payload, 1, false);
+                    decode.RawData.length = payload[3];
+                    let dataSize = 2 // Each value is two bytes
+
+                    decode.RawData.data = [];
+                    for (let i = 0; i < decode.RawData.length; i++) {
+                        let data_sample = {};
+                        data_sample.index = decode.RawData.index + i;
+                        data_sample.value = arrayToInt16(payload, dataSize * (i) + 4, false); // 4 byte offset as we have AXIS+INDEX+LENGTH
+                        decode.RawData.data.push(data_sample);
+                    }
+                    break;
+                }
             case 0xF801: // DevEUI
                 decode.DevEui = arrayToString(payload);
                 break;
