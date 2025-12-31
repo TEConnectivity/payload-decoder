@@ -726,9 +726,14 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
 
                     // Parcours de toutes les fenetres, par defaut il y en a 8 en preset ID 0 
                     for (let windowIndex = 0; windowIndex < windowsNumber; windowIndex++) {
-                        let window_data = {}
+                        // Add a key to all windows: "status" with values "enabled" / "disabled"
+                        let window_data = { status: 'disabled' }
                         // Two first byte of the window
-                        window_data.rms_window = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize, 2, false)
+                        const _rms_window = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize, 2, false)
+                        if (_rms_window !== 0xFFFF) {
+                            window_data.rms_window = _rms_window
+                            window_data.status = 'enabled'
+                        }
 
                         let peak1_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
                         if (peak1_bin !== 0xFFFF) {
@@ -739,7 +744,6 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
 
                         let peak2_bin = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 6, 2, false)
                         if (peak2_bin !== 0xFFFF) {
-
                             window_data.peak2_bin = peak2_bin
                             window_data.peak2_frequency = window_data.peak2_bin * BW_MODE_RESOLUTION[decode.bw_mode]
                             window_data.peak2_rms = arrayConverter(bytes, offsetStartWindows + windowIndex * windowSize + 8, 2, false)
@@ -753,7 +757,7 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                         }
 
                         decode.vibration_data.windows.push(window_data);
-
+                        
                     }
 
                     break;
