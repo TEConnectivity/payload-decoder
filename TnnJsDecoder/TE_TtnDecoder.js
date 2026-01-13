@@ -48,8 +48,8 @@ function te_decoder(bytes, port) {
                 if (DecodeU8900(decode, port, bytes) === false)
                     if (DecodeU8900Pof(decode, port, bytes) === false)
                         if (DecodeSinglePointOrMultiPoint(decode, port, bytes, error_dict) === false)
-                            if (DecodeTiltSensor(decode, port, bytes) === false)
-                                if (DecodeOperationResponses(decode, port, bytes) === false)
+                            if (DecodeProtocolV2(decode, port, bytes, error_dict) === false)
+                                if (DecodeTiltSensor(decode, port, bytes) === false)
                                     if (DecodeKeepAlive(decode, port, bytes) === false) {
                                         decode.val = 'Unknown frame';
                                         decode.port = port;
@@ -272,271 +272,272 @@ function DecodeU8900Pof(decode, port, bytes) {
 //port 20  AComZGU4ZWFiMTdhZDVm  00 2a 26 64 65 38 65 61 62 31 37 61 64 35 66 fw rev
 //port 30  /EyEARwhj keep alive 132100470863
 function DecodeOperationResponses(decode, port, bytes) {
-    var res = false;
-    if (port === 20) {
-        res = true;
-        var OperationRepsType = {
-            0: "Read",
-            1: "Write",
-            2: "Write+Read"
-        }
-        var OperationFlag = {
-            7: "UuidErr",
-            6: "OpErr/PayloadErr",
-            5: "ReadOnly/WrongOp",
-            4: "NetwErr",
 
+    var OperationRepsType = {
+        0: "Read",
+        1: "Write",
+        2: "Write+Read"
+    }
+    var OperationFlag = {
+        7: "UuidErr",
+        6: "OpErr/PayloadErr",
+        5: "ReadOnly/WrongOp",
+        4: "NetwErr",
+
+    }
+    decode.op = OperationRepsType[bytes[0] & 0x3];
+    decode.opFlag = [];
+    for (var i = 7; i > 4; i--) {
+        if (bitfield(bytes[0], i) === 1) {
+            decode.opFlag.push(OperationFlag[i]);
         }
-        decode.op = OperationRepsType[bytes[0] & 0x3];
-        decode.opFlag = [];
-        for (var i = 7; i > 4; i--) {
-            if (bitfield(bytes[0], i) === 1) {
-                decode.opFlag.push(OperationFlag[i]);
+    }
+    var uuid = arrayToUint16(bytes, 1, false)
+    decode.uuid = uuid.toString(16);
+    var payload = bytes.slice(3)
+    switch (uuid) {
+        case 0x2A24:
+            decode.model = arrayToAscii(payload);
+            break;
+        case 0x2A25:
+            decode.sn = arrayToAscii(payload);
+            break;
+        case 0x2A26:
+            decode.fwrev = arrayToAscii(payload);
+            break;
+        case 0x2A27:
+            decode.hwrev = arrayToAscii(payload);
+            break;
+        case 0x2A29:
+            decode.manuf = arrayToAscii(payload);
+            break;
+        // case 0xFC01: // Device Status
+        //     getDevstat(payload);
+        //     break;
+        case 0xCF01: // Sensor Diagnosis
+
+            var SensorDiagFlag = {
+                7: "TEMP16_OoR_ERR",
+                4: "TEMP16_CIR_ERR",
+                3: "SENSOR32_OoR_ERR",
+                0: "SENSOR32_CIR_ERR",
+
             }
-        }
-        var uuid = arrayToUint16(bytes, 1, false)
-        decode.uuid = uuid.toString(16);
-        var payload = bytes.slice(3)
-        switch (uuid) {
-            case 0x2A24:
-                decode.model = arrayToAscii(payload);
-                break;
-            case 0x2A25:
-                decode.sn = arrayToAscii(payload);
-                break;
-            case 0x2A26:
-                decode.fwrev = arrayToAscii(payload);
-                break;
-            case 0x2A27:
-                decode.hwrev = arrayToAscii(payload);
-                break;
-            case 0x2A29:
-                decode.manuf = arrayToAscii(payload);
-                break;
-            // case 0xFC01: // Device Status
-            //     getDevstat(payload);
-            //     break;
-            case 0xCF01: // Sensor Diagnosis
+            decode.sensor_diagnosis = extract_bitfield(payload[0], SensorDiagFlag)
 
-                var SensorDiagFlag = {
-                    7: "TEMP16_OoR_ERR",
-                    4: "TEMP16_CIR_ERR",
-                    3: "SENSOR32_OoR_ERR",
-                    0: "SENSOR32_CIR_ERR",
+            break;
+        case 0xCF02: // Comm Diagnosis
 
-                }
-                decode.sensor_diagnosis = extract_bitfield(payload[0], SensorDiagFlag)
+            var CommDiagFlag = {
+                2: "LoRa_Network_Join_Error",
+                1: "LoRa_Power_Error",
+                0: "LoRa_Regional_Restriction",
 
-                break;
-            case 0xCF02: // Comm Diagnosis
+            }
+            decode.comm_diagnosis = extract_bitfield(payload[0], CommDiagFlag)
 
-                var CommDiagFlag = {
-                    2: "LoRa_Network_Join_Error",
-                    1: "LoRa_Power_Error",
-                    0: "LoRa_Regional_Restriction",
+            break;
+        case 0xCF03: // Battery Diagnosis
+            var BatteryDiagFlag = {
+                2: "Battery_Warning",
+                1: "Battery_Low",
+                0: "Battery_Change",
 
-                }
-                decode.comm_diagnosis = extract_bitfield(payload[0], CommDiagFlag)
+            }
+            decode.comm_diagnosis = extract_bitfield(payload[0], BatteryDiagFlag)
+            break;
+        case 0xB301: // Meas Counter
+            decode.meas_counter = arrayToInt16(payload, 0, false)
+            break;
+        case 0xB302: // Meas interval
+            decode.measInt = payload[0].toString() + 'h ' + payload[1].toString() + ' min' + payload[2].toString() + ' sec';
+            break;
+        case 0x2A19: // Battery
+            decode.batt = payload[0];
+            break;
+        case 0xCE01: // Keepalive
+            var KeepAliveInterval = {
+                0: "24h",
+                1: "12h",
+                2: "8h",
+                3: "4h",
+                4: "2h"
+            }
+            var KeepAliveMode = {
+                0: "AnyTime",
+                1: "IfSilent",
+                2: "Disable"
+            }
+            decode.kaCfg = {};
+            decode.kaCfg.mode = KeepAliveMode[(payload[0] >> 3) & 0x3];
+            decode.kaCfg.interval = KeepAliveInterval[payload[0] & 0x7];
+            break;
+        case 0xB201: // Threshold 
+            var ThsSrc = {
+                0: "MainRaw",
+                1: "MainDelta",
+                2: "SecondaryRaw",
+                3: "SecondaryDelta",
+                0xFF: "Error"
+            }
+            var ThsSel = {
+                0: "Config",
+                1: "Level",
+                2: "MeasInterval",
+                3: "ComMode",
+                0xFF: "Error"
+            }
+            decode.ThsCfg = {};
+            decode.ThsCfg.Src = ThsSrc[payload[0]];
+            decode.ThsCfg.Sel = ThsSel[payload[1]];
+            switch (decode.ThsCfg.Sel) {
+                case "Config":
+                    decode.ThsCfg.cfg = {};
+                    decode.ThsCfg.cfg.eventFlag = bitfield(payload[2], 7);
+                    decode.ThsCfg.cfg.enable = bitfield(payload[2], 6);
+                    decode.ThsCfg.cfg.condition = (bitfield(payload[2], 5) === 1) ? 'above (data>level)' : 'below (data<level)';
+                    decode.ThsCfg.cfg.autoclr = bitfield(payload[2], 4);
+                    decode.ThsCfg.cfg.actionMeasIntEn = bitfield(payload[2], 3)
+                    decode.ThsCfg.cfg.actionAdvModeEn = bitfield(payload[2], 2)
+                    decode.ThsCfg.cfg.actionUplModeEn = bitfield(payload[2], 1)
+                    break;
+                case "Level":
+                    decode.ThsCfg.lvl = {};
+                    if (payload.length - 2 >= 4) {
+                        decode.ThsCfg.lvl.valf32 = arrayToFloat(payload, 2, false);
+                        decode.ThsCfg.lvl.vali32 = arrayToInt32(payload, 2, false) / 100.0;
 
-                break;
-            case 0xCF03: // Battery Diagnosis
-                var BatteryDiagFlag = {
-                    2: "Battery_Warning",
-                    1: "Battery_Low",
-                    0: "Battery_Change",
-
-                }
-                decode.comm_diagnosis = extract_bitfield(payload[0], BatteryDiagFlag)
-                break;
-            case 0xB301: // Meas Counter
-                decode.meas_counter = arrayToInt16(payload, 0, false)
-                break;
-            case 0xB302: // Meas interval
-                decode.measInt = payload[0].toString() + 'h ' + payload[1].toString() + ' min' + payload[2].toString() + ' sec';
-                break;
-            case 0x2A19: // Battery
-                decode.batt = payload[0];
-                break;
-            case 0xCE01: // Keepalive
-                var KeepAliveInterval = {
-                    0: "24h",
-                    1: "12h",
-                    2: "8h",
-                    3: "4h",
-                    4: "2h"
-                }
-                var KeepAliveMode = {
-                    0: "AnyTime",
-                    1: "IfSilent",
-                    2: "Disable"
-                }
-                decode.kaCfg = {};
-                decode.kaCfg.mode = KeepAliveMode[(payload[0] >> 3) & 0x3];
-                decode.kaCfg.interval = KeepAliveInterval[payload[0] & 0x7];
-                break;
-            case 0xB201: // Threshold 
-                var ThsSrc = {
-                    0: "MainRaw",
-                    1: "MainDelta",
-                    2: "SecondaryRaw",
-                    3: "SecondaryDelta",
-                    0xFF: "Error"
-                }
-                var ThsSel = {
-                    0: "Config",
-                    1: "Level",
-                    2: "MeasInterval",
-                    3: "ComMode",
-                    0xFF: "Error"
-                }
-                decode.ThsCfg = {};
-                decode.ThsCfg.Src = ThsSrc[payload[0]];
-                decode.ThsCfg.Sel = ThsSel[payload[1]];
-                switch (decode.ThsCfg.Sel) {
-                    case "Config":
-                        decode.ThsCfg.cfg = {};
-                        decode.ThsCfg.cfg.eventFlag = bitfield(payload[2], 7);
-                        decode.ThsCfg.cfg.enable = bitfield(payload[2], 6);
-                        decode.ThsCfg.cfg.condition = (bitfield(payload[2], 5) === 1) ? 'above (data>level)' : 'below (data<level)';
-                        decode.ThsCfg.cfg.autoclr = bitfield(payload[2], 4);
-                        decode.ThsCfg.cfg.actionMeasIntEn = bitfield(payload[2], 3)
-                        decode.ThsCfg.cfg.actionAdvModeEn = bitfield(payload[2], 2)
-                        decode.ThsCfg.cfg.actionUplModeEn = bitfield(payload[2], 1)
-                        break;
-                    case "Level":
-                        decode.ThsCfg.lvl = {};
-                        if (payload.length - 2 >= 4) {
-                            decode.ThsCfg.lvl.valf32 = arrayToFloat(payload, 2, false);
-                            decode.ThsCfg.lvl.vali32 = arrayToInt32(payload, 2, false) / 100.0;
-
-                            decode.ThsCfg.lvl.vali16 = arrayToInt16(payload, 4, false) / 100.0;
-                        }
-                        else {
-                            decode.ThsCfg.lvl.err = "wrong size";
-                        }
-                        break;
-                    case "MeasInterval":
-                        decode.ThsCfg.measInt = payload[2].toString() + 'h ' + payload[3].toString() + ' min' + payload[4].toString() + ' sec';
-                        break;
-                    case "ComMode":
-                        var ThsComBleMode = {
-                            0: "Periodic",
-                            1: "On Measure",
-                            2: "ADV Silent"
-                        }
-                        var ThsComLoraMode = {
-                            0: "On Measurement",
-                            1: "Silent",
-                            2: "Merge"
-                        }
-                        decode.ThsCfg.ComMode = {};
-                        decode.ThsCfg.ComMode.ble = ThsComBleMode[payload[2] & 0x03];
-                        decode.ThsCfg.ComMode.lora = ThsComLoraMode[payload[3] & 0x03];
-                        break;
-                    default:
-                        break;
-                }
-                break;
-            case 0xDB01: // Datalog
-                {
-                    var DataLogDataType = {
-                        0: "Temperature",
-                        1: "MainData",
-                        2: "Temperature+MainData"
+                        decode.ThsCfg.lvl.vali16 = arrayToInt16(payload, 4, false) / 100.0;
                     }
-                    var DataLogDataSize = {
-                        0: 2,
-                        1: 4,
-                        2: 6,
-                    }
-                    decode.Datalog = {};
-                    decode.Datalog.type = DataLogDataType[payload[0]];
-                    decode.Datalog.index = arrayToUint16(payload, 1, false);
-                    decode.Datalog.length = payload[3];
-                    let dataSize = DataLogDataSize[payload[0]];
-                    decode.Datalog.data = [];
-                    // eslint-disable-next-line
-                    for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize * (i + 1) + 4); i++) {
-                        var dataN = {};
-                        dataN.index = decode.Datalog.index + i;
-                        switch (decode.Datalog.type) {
-                            case "Temperature":
-                                dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
-                                break;
-                            case "MainData":
-                                dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4, false) / 100.0;
-                                dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4, false);
-                                break;
-                            case "Temperature+MainData":
-                                dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
-                                dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4 + 2, false) / 100.0;
-                                dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4 + 2, false);
-                                break;
-                            default: break;
-                        }
-                        decode.Datalog.data.push(dataN);
+                    else {
+                        decode.ThsCfg.lvl.err = "wrong size";
                     }
                     break;
-                }
-            case 0xDA03: // Vibration Raw Data
-                {
-                    var Axis = {
-                        1: "Z",
-                        2: "Y",
-                        4: "X"
-                    }
-                    decode.RawData = {};
-                    decode.RawData.axis = Axis[payload[0]];
-                    decode.RawData.index = arrayToUint16(payload, 1, false);
-                    decode.RawData.length = payload[3];
-                    let dataSize = 2 // Each value is two bytes
-
-                    decode.RawData.data = [];
-                    for (let i = 0; i < decode.RawData.length; i++) {
-                        let data_sample = {};
-                        data_sample.index = decode.RawData.index + i;
-                        data_sample.value = arrayToInt16(payload, dataSize * (i) + 4, false); // 4 byte offset as we have AXIS+INDEX+LENGTH
-                        decode.RawData.data.push(data_sample);
-                    }
+                case "MeasInterval":
+                    decode.ThsCfg.measInt = payload[2].toString() + 'h ' + payload[3].toString() + ' min' + payload[4].toString() + ' sec';
                     break;
+                case "ComMode":
+                    var ThsComBleMode = {
+                        0: "Periodic",
+                        1: "On Measure",
+                        2: "ADV Silent"
+                    }
+                    var ThsComLoraMode = {
+                        0: "On Measurement",
+                        1: "Silent",
+                        2: "Merge"
+                    }
+                    decode.ThsCfg.ComMode = {};
+                    decode.ThsCfg.ComMode.ble = ThsComBleMode[payload[2] & 0x03];
+                    decode.ThsCfg.ComMode.lora = ThsComLoraMode[payload[3] & 0x03];
+                    break;
+                default:
+                    break;
+            }
+            break;
+        case 0xDB01: // Datalog
+            {
+                var DataLogDataType = {
+                    0: "Temperature",
+                    1: "MainData",
+                    2: "Temperature+MainData"
                 }
-            case 0xF801: // DevEUI
-                decode.DevEui = arrayToString(payload);
-                break;
-            case 0xF802: // AppEUI
-                decode.AppEui = arrayToString(payload);
-                break;
-            case 0xF803: // Region
-                var RegionType = {
-                    0: "AS923",
-                    1: "AU915",
-                    2: "CN470",
-                    3: "CN779",
-                    4: "EU433",
-                    5: "EU868",
-                    6: "KR920",
-                    7: "IN865",
-                    8: "US915"
+                var DataLogDataSize = {
+                    0: 2,
+                    1: 4,
+                    2: 6,
                 }
-                decode.Region = RegionType[payload[0] & 0x0F];
+                decode.Datalog = {};
+                decode.Datalog.type = DataLogDataType[payload[0]];
+                decode.Datalog.index = arrayToUint16(payload, 1, false);
+                decode.Datalog.length = payload[3];
+                let dataSize = DataLogDataSize[payload[0]];
+                decode.Datalog.data = [];
+                // eslint-disable-next-line
+                for (var i = 0; i < decode.Datalog.length && payload.length > (dataSize * (i + 1) + 4); i++) {
+                    var dataN = {};
+                    dataN.index = decode.Datalog.index + i;
+                    switch (decode.Datalog.type) {
+                        case "Temperature":
+                            dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
+                            break;
+                        case "MainData":
+                            dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4, false) / 100.0;
+                            dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4, false);
+                            break;
+                        case "Temperature+MainData":
+                            dataN.temp = arrayToUint16(payload, dataSize * (i) + 4, false) / 100.0;
+                            dataN.maini32 = arrayToInt32(payload, dataSize * (i) + 4 + 2, false) / 100.0;
+                            dataN.mainf32 = arrayToFloat(payload, dataSize * (i) + 4 + 2, false);
+                            break;
+                        default: break;
+                    }
+                    decode.Datalog.data.push(dataN);
+                }
                 break;
-            case 0xF804: // NetID
-                decode.netId = arrayToString(payload);
+            }
+        case 0xDA03: // Vibration Raw Data
+            {
+                var Axis = {
+                    1: "Z",
+                    2: "Y",
+                    4: "X"
+                }
+                decode.RawData = {};
+                decode.RawData.axis = Axis[payload[0]];
+                decode.RawData.index = arrayToUint16(payload, 1, false);
+                decode.RawData.length = payload[3];
+                let dataSize = 2 // Each value is two bytes
+
+                decode.RawData.data = [];
+                for (let i = 0; i < decode.RawData.length; i++) {
+                    let data_sample = {};
+                    data_sample.index = decode.RawData.index + i;
+                    data_sample.value = arrayToInt16(payload, dataSize * (i) + 4, false); // 4 byte offset as we have AXIS+INDEX+LENGTH
+                    decode.RawData.data.push(data_sample);
+                }
                 break;
-            default:
-                decode.payload = []
-                decode.payload = arrayToString(payload);
+            }
+        case 0xF801: // DevEUI
+            decode.DevEui = arrayToString(payload);
+            break;
+        case 0xF802: // AppEUI
+            decode.AppEui = arrayToString(payload);
+            break;
+        case 0xF803: // Region
+            var RegionType = {
+                0: "AS923",
+                1: "AU915",
+                2: "CN470",
+                3: "CN779",
+                4: "EU433",
+                5: "EU868",
+                6: "KR920",
+                7: "IN865",
+                8: "US915"
+            }
+            decode.Region = RegionType[payload[0] & 0x0F];
+            break;
+        case 0xF804: // NetID
+            decode.netId = arrayToString(payload);
+            break;
+        case 0xAA01: // Protocol Version
+            decode.protocol_version = payload[0]
+            break;
+        case 0xDA04: // Measurement Timestamp
+            const ts32 = arrayConverter(payload, 0, 3, false, false)
+            const date = new Date(ts32 * 1000);
+            decode.sensor_timestamp = date.toISOString()
+        default:
+            decode.payload = []
+            decode.payload = arrayToString(payload);
 
-                break;
-        }
-
-
+            break;
     }
-    else {
-        res = false;
-    }
-    return res;
+
+    return true;
 }
+
 function DecodeKeepAlive(decode, port, bytes) {
     if (port === 30) {
         decode.msgType = "Keep Alive";
@@ -595,6 +596,12 @@ function DecodeTiltSensor(decode, port, bytes) {
 }
 
 function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
+
+    if (port == 20) {
+        DecodeOperationResponses(decode, bytes)
+        return true
+    }
+
     if (port === 10) {
 
         // Mapping between bw_mode and bin resolution
@@ -717,14 +724,14 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                     decode.vibration_data.windows = []
 
                     let windowSize = 14
-                    // Les fenetre demarrent a partir de cette offset
+                    // Window start from this offset
                     let offsetStartWindows = 17
 
-                    // On enleve tous les bytes de header, on enleve la derniere fenetre si elle est fragmente
+                    // Remove all byte from header and delete last window if fragmented
                     let windowsNumber = Math.floor((bytes.length - offsetStartWindows) / windowSize)
 
 
-                    // Parcours de toutes les fenetres, par defaut il y en a 8 en preset ID 0 
+                    // Going trhgouh all window 
                     for (let windowIndex = 0; windowIndex < windowsNumber; windowIndex++) {
                         // Add a key to all windows: "status" with values "enabled" / "disabled"
                         let window_data = { status: 'disabled' }
@@ -821,7 +828,308 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
 
 
     } else if (port === 138 || port === 202) {
-        decode.val = 'Vibration Multipoint : Fragmented frame NOT SUPPORTED by TTN Live Decoder';
+        decode.val = 'This LNS does not support fragmented frame. (Vibration Multipoint FW)';
+        decode.port = port;
+        decode.bytes = arrayToString(bytes);
+        return true;
+    }
+    return false;
+}
+
+
+function DecodeProtocolV2(decode, port, bytes, error) {
+    // Check the sensor type, then the frame type, then check what are the optional field, then finally decode the data.
+
+    if (port === 21) {
+
+        // Check if frame received is of Protocol v2
+        if ((bytes[0] & 0xF0) !== 0x20) {
+            error.push("Received invalid frame, please contact TE and provide this exact frame")
+            return false
+        }
+
+        let sensor_type = bytes[0] & 0x0F
+        decode.devtype = {}
+        const sensorTypes = {
+            0: "Error",
+            1: "Vibration1Axis",
+            2: "Temperature",
+            3: "Pressure",
+            4: "Humidity",
+            5: "Vibration3Axis"
+        }
+        decode.devtype.sensor = sensorTypes[sensor_type] || "Unknown"
+
+        const frameType = {
+            0x00: "DownlinkResponse",
+            0x01: "KeepAlive",
+            0x02: "AdvertisingWithCounter",
+            0x03: "AdvertisingWithTimestamp",
+            0x04: "LoRaSingleMeasurement",
+            0x05: "LoRaMergedMeasurement"
+        }
+        decode.frameType = frameType[bytes[1]] || "Unknown"
+
+        decode.devstat = getDevstat(bytes[2])
+
+        decode.bat = bytes[3];
+
+        const payload = bytes.slice(4)
+        switch (decode.frameType) {
+            case "DownlinkResponse":
+                DecodeOperationResponses(decode, payload)
+                break;
+            case "KeepAlive":
+                decode.cnt = arrayToInt16(payload)
+                break;
+            case "LoRaSingleMeasurement":
+                decodeLoRaSimpleMeasurement(decode, payload)
+                break;
+            case "LoRaMergedeMeasurement":
+                break;
+
+        }
+
+
+        function decodeLoRaSimpleMeasurement(decode, payload) {
+
+            decode.measurement = {}
+            const OptionMap = {
+                0: "MeasurementCounter",
+                1: "Timestamp",
+                2: "SecondaryTemperature"
+            }
+            decode.optional_field = extract_bitfield(payload[0], OptionMap)
+
+            // Keep track of optional field offset
+            let offset = 0
+
+            if (decode.optional_field.includes("MeasurementCounter")) {
+                decode.cnt = arrayConverter(payload, 1, 2, false, false)
+                offset += 2
+            }
+
+            if (decode.optional_field.includes("Timestamp")) {
+                decode.timestamp = arrayConverter(payload, offset + 1, 4, false, false)
+                decode.timestamp_human = new Date(decode.timestamp * 1000).toISOString();
+
+                offset += 4
+            }
+
+            if (decode.optional_field.includes("SecondaryTemperature")) {
+                decode.temp = (arrayToInt16(payload, offset + 1, false) / 100.0).toString()
+
+                offset += 2
+            }
+
+            const meas_data = payload.slice(offset + 1)
+            console.log(meas_data)
+            switch (decode.devtype.sensor) {
+                case "Vibration1Axis":
+                case "Vibration3Axis":
+                    decodeVibration(decode, meas_data)
+                    break;
+
+                case "Temperature":
+                case "Humidity":
+                case "Pressure":
+                    break;
+            }
+        }
+
+        function decodeVibration(decode, meas_data) {
+
+            // Mapping between bw_mode and bin resolution
+            const BW_MODE_RESOLUTION = {
+                0x00: 0.125,
+                0x01: 0.25,
+                0x02: 0.5,
+                0x03: 1,
+                0x04: 2,
+                0x05: 3,
+                0x06: 4,
+                0x07: 5,
+                0x08: 6,
+                0x09: 7,
+                0x0A: 8,
+                0x0B: 9,
+                0x0C: 10,
+                0x0D: 11,
+                0x0E: 12,
+                0x0F: 13,
+            }
+
+            decode.vibration_information = {}
+            decode.vibration_information.frame_format = getBits(meas_data[0], 0, 2)
+            decode.vibration_information.rotating_mode = getBits(meas_data[0], 4, 1)
+            decode.vibration_information.axis = []
+            if (getBits(meas_data[0], 5, 1) === 1)
+                decode.vibration_information.axis.push("x");
+            if (getBits(meas_data[0], 6, 1) === 1)
+                decode.vibration_information.axis.push("y");
+            if (getBits(meas_data[0], 7, 1) === 1)
+                decode.vibration_information.axis.push("z");
+            decode.preset_id = meas_data[1];
+            decode.bw_mode = meas_data[2];
+
+            let vib_raw_data = meas_data.slice(3)
+            decode.vibration_data = {}
+
+
+            switch (decode.vibration_information.frame_format) {
+                // DATA FORMAT 0, with 2bytes as RFU
+                case 0:
+
+                    var axisSize = 6
+                    // Offset to keep track if an axis existed or not, axis should always come X then Y then Z
+                    let offset = 0
+
+                    if (decode.vibration_information.axis.includes("x")) {
+                        decode.vibration_data.x = {}
+                        decode.vibration_data.x.time_rms = arrayConverter(vib_raw_data, 0, 2, false)
+                        decode.vibration_data.x.time_p2p = arrayConverter(vib_raw_data, 2, 2, false)
+                        offset += 1
+                    }
+
+                    if (decode.vibration_information.axis.includes("y")) {
+                        decode.vibration_data.y = {}
+                        decode.vibration_data.y.time_rms = arrayConverter(vib_raw_data, offset * axisSize + 0, 2, false)
+                        decode.vibration_data.y.time_p2p = arrayConverter(vib_raw_data, offset * axisSize + 2, 2, false)
+                        offset += 1
+                    }
+
+                    if (decode.vibration_information.axis.includes("z")) {
+                        decode.vibration_data.z = {}
+                        decode.vibration_data.z.time_rms = arrayConverter(vib_raw_data, offset * axisSize + 0, 2, false)
+                        decode.vibration_data.z.time_p2p = arrayConverter(vib_raw_data, offset * axisSize + 2, 2, false)
+                    }
+
+                    break;
+
+                // DATA FORMAT 1 is the default one, because it the format selected in the default preset ID 0
+                case 1:
+                    decode.vibration_data.spectrum_rms = arrayConverter(vib_raw_data, 0, 2, false)
+                    decode.vibration_data.time_p2p = arrayConverter(vib_raw_data, 2, 2, false)
+                    decode.vibration_data.velocity = arrayConverter(vib_raw_data, 4, 2, false)
+                    decode.vibration_data.windows = []
+
+                    let windowSize = 14
+                    // Les fenetre demarrent a partir de cette offset
+                    let offsetStartWindows = 6
+
+                    // On enleve tous les bytes de header, on enleve la derniere fenetre si elle est fragmente
+                    let windowsNumber = Math.floor((vib_raw_data.length - offsetStartWindows) / windowSize)
+
+
+                    // Parcours de toutes les fenetres, par defaut il y en a 8 en preset ID 0 
+                    for (let windowIndex = 0; windowIndex < windowsNumber; windowIndex++) {
+                        let window_data = {}
+
+                        // Two first byte of the window
+                        let winRMS = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize, 2, false)
+                        if (winRMS === 0xFFFF) {
+                            window_data.disabled = true
+                        } else
+                            window_data.rms_window = winRMS;
+
+                        let peak1_bin = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 2, 2, false)
+                        if (peak1_bin !== 0xFFFF) {
+                            window_data.peak1_bin = peak1_bin
+                            window_data.peak1_frequency = window_data.peak1_bin * BW_MODE_RESOLUTION[decode.bw_mode]
+                            window_data.peak1_rms = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 4, 2, false)
+                        }
+
+                        let peak2_bin = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 6, 2, false)
+                        if (peak2_bin !== 0xFFFF) {
+
+                            window_data.peak2_bin = peak2_bin
+                            window_data.peak2_frequency = window_data.peak2_bin * BW_MODE_RESOLUTION[decode.bw_mode]
+                            window_data.peak2_rms = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 8, 2, false)
+                        }
+
+                        let peak3_bin = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 10, 2, false)
+                        if (peak3_bin !== 0xFFFF) {
+                            window_data.peak3_bin = peak3_bin
+                            window_data.peak3_frequency = window_data.peak3_bin * BW_MODE_RESOLUTION[decode.bw_mode]
+                            window_data.peak3_rms = arrayConverter(vib_raw_data, offsetStartWindows + windowIndex * windowSize + 12, 2, false)
+                        }
+
+                        decode.vibration_data.windows.push(window_data);
+
+                    }
+
+                    break;
+
+                // DATA FORMAT 2
+                case 2:
+                    decode.vibration_data.spectrum_rms = arrayConverter(vib_raw_data, 0, 2, false)
+                    decode.vibration_data.time_p2p = arrayConverter(vib_raw_data, 2, 2, false)
+                    decode.vibration_data.velocity = arrayConverter(vib_raw_data, 4, 2, false)
+
+                    decode.vibration_data.window_count = vib_raw_data[6]
+
+                    decode.vibration_data.windows_rms = []
+
+                    for (let windowIndex = 0; windowIndex < decode.vibration_data.window_count; windowIndex++) {
+
+                        var window_rms = arrayConverter(vib_raw_data, 7 + 2 * windowIndex, 2, false)
+
+                        decode.vibration_data.windows_rms.push(window_rms);
+                    }
+
+
+                    decode.vibration_data.peak_cnt = vib_raw_data[7 + 2 * decode.vibration_data.window_count]
+                    decode.vibration_data.peaks = []
+
+                    let peak_size = 19;
+
+                    /** Peaks start from this offset (bytes) */
+                    let offsetStartPeaks = 8 + 2 * decode.vibration_data.window_count
+
+                    // Hold the byte containing the peaks
+                    let peaks = vib_raw_data.slice(offsetStartPeaks, peak_size * decode.vibration_data.peak_cnt)
+                    // Hold the byte in binary represntation "010101". Use string instead of number because BigInt not widely supported.
+                    let peaks_bitfield = "";
+
+                    peaks.forEach(byte => {
+                        peaks_bitfield += byte.toString(2).padStart(8, '0');
+                    });
+
+                    // Hold the cursor for bit indexing inside peaks
+                    let current_bit_index = 0;
+                    for (let peakIndex = 0; peakIndex < decode.vibration_data.peak_cnt; peakIndex++) {
+                        if (current_bit_index + 19 > peaks_bitfield.length) {
+                            // Not enough bits left for another (PEAK_BIN, PEAK_MAGNITUDE) pair
+                            break;
+                        }
+
+                        let peak_data = {}
+
+                        // Bin index is 11 bit wide
+                        peak_data.bin_index = parseInt(peaks_bitfield.substring(current_bit_index, current_bit_index + 11), 2)
+                        peak_data.frequency = peak_data.bin_index * BW_MODE_RESOLUTION[decode.bw_mode]
+                        current_bit_index += 11;
+
+                        // Magnitude is just after, 8 bit wide
+                        peak_data.magnitude_compressed = parseInt(peaks_bitfield.substring(current_bit_index, current_bit_index + 8), 2);
+                        peak_data.magnitude_rms = dBDecompression(peak_data.magnitude_compressed)
+                        current_bit_index += 8;
+
+                        decode.vibration_data.peaks.push(peak_data);
+                    }
+                    break;
+
+                default:
+                    break;
+
+            }
+
+        }
+
+
+        return true;
+    } else if (port === 149 || port === 213) {
+        decode.val = 'This LNS does not support fragmented frame.';
         decode.port = port;
         decode.bytes = arrayToString(bytes);
         return true;
@@ -838,7 +1146,7 @@ function getDevstat(u8devstat) {
         4: "ThsTriggered",
         3: "PrelPhase",
         2: "Reserved",
-        1: "Reserved",
+        1: "TimeErr",
         0: "BattErr"
     }
 
