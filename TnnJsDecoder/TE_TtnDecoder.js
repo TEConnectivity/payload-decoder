@@ -528,6 +528,7 @@ function DecodeOperationResponses(decode, port, bytes) {
             const ts32 = arrayConverter(payload, 0, 3, false, false)
             const date = new Date(ts32 * 1000);
             decode.sensor_timestamp = date.toISOString()
+            break;
         default:
             decode.payload = []
             decode.payload = arrayToString(payload);
@@ -597,7 +598,7 @@ function DecodeTiltSensor(decode, port, bytes) {
 
 function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
 
-    if (port == 20) {
+    if (port === 20) {
         DecodeOperationResponses(decode, bytes)
         return true
     }
@@ -764,7 +765,7 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
                         }
 
                         decode.vibration_data.windows.push(window_data);
-                        
+
                     }
 
                     break;
@@ -887,7 +888,8 @@ function DecodeProtocolV2(decode, port, bytes, error) {
                 break;
             case "LoRaMergedeMeasurement":
                 break;
-
+            default:
+                break;
         }
 
 
@@ -933,6 +935,9 @@ function DecodeProtocolV2(decode, port, bytes, error) {
                 case "Temperature":
                 case "Humidity":
                 case "Pressure":
+                    break;
+
+                default:
                     break;
             }
         }
