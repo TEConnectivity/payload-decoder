@@ -837,7 +837,11 @@ function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
     return false;
 }
 
-
+/**
+ * 
+ * @param {Uint8Array} bytes 
+ * @returns Error status (true or false)
+ */
 function DecodeProtocolV2(decode, port, bytes, error) {
     // Check the sensor type, then the frame type, then check what are the optional field, then finally decode the data.
 
@@ -886,12 +890,12 @@ function DecodeProtocolV2(decode, port, bytes, error) {
             case "LoRaSingleMeasurement":
                 decodeLoRaSimpleMeasurement(decode, payload)
                 break;
-            case "LoRaMergedeMeasurement":
+            case "LoRaMergedMeasurement":
+                decodeLoRaMergedMeasurement(decode, payload)
                 break;
             default:
                 break;
         }
-
 
         function decodeLoRaSimpleMeasurement(decode, payload) {
 
@@ -1147,6 +1151,99 @@ function DecodeProtocolV2(decode, port, bytes, error) {
 
         }
 
+        function decodeLoRaMergedMeasurement(decode, payload) {
+
+            const sensor_data_type = {
+                0x01: "Float",
+                0x02: "Int32",
+            }
+            decode.sensor_data_type = sensor_data_type[payload[0]] || "RFU"
+
+
+            const OptionMap = {
+                0: "MeasurementCounter",
+                1: "Timestamp",
+                2: "SecondaryTemperature"
+            }
+            decode.optional_field = extract_bitfield(payload[1], OptionMap)
+
+            decode.measurements = []
+
+            // Moving offset, depending on optional fields
+            let offset = 2
+
+            ////// Measurement data ZERO
+
+            let measure = {}
+
+            if (decode.optional_field.includes("MeasurementCounter")) {
+                measure.cnt = arrayConverter(payload, offset, 2, false, false)
+                offset += 2
+            }
+
+            if (decode.optional_field.includes("Timestamp")) {
+                measure.timestamp = arrayConverter(payload, offset, 4, false, false)
+                measure.timestamp_human = new Date(measure.timestamp * 1000).toISOString();
+
+                offset += 4
+            }
+
+            if (decode.optional_field.includes("SecondaryTemperature")) {
+                measure.temp = (arrayToInt16(payload, offset, false) / 100.0).toString()
+
+                offset += 2
+            }
+
+            if (decode.sensor_data_type === "Float") {
+                measure.data = (arrayToFloat(payload, offset, false)).toString();
+            }
+            else {
+                measure.data = (arrayToInt32(payload, offset, false) / 100.0).toString();
+            }
+            offset += 4
+            decode.measurements.push(measure)
+
+            ////// Measurement data NEXT
+
+            // Number of measurement is computed dynamically with the frame size. It's not counting the first one (differnet size)
+            let number_of_measurements = (payload.length - 14) / 10
+
+            for (let i = 0; i < number_of_measurements; i++) {
+                let measure = {}
+
+                if (decode.optional_field.includes("MeasurementCounter")) {
+                    measure.cnt_delta = payload[offset]
+                    offset += 1
+                }
+
+                if (decode.optional_field.includes("Timestamp")) {
+
+                    let previous_ts = decode.measurements[i].timestamp
+
+                    measure.timestamp_delta = arrayConverter(payload, offset, 3, false, false)
+                    measure.timestamp = measure.timestamp_delta + previous_ts
+                    measure.timestamp_human = new Date(measure.timestamp * 1000).toISOString();
+
+                    offset += 3
+                }
+
+                if (decode.optional_field.includes("SecondaryTemperature")) {
+                    measure.temp = (arrayToInt16(payload, offset, false) / 100.0).toString()
+
+                    offset += 2
+                }
+
+                if (decode.sensor_data_type === "Float") {
+                    measure.data = (arrayToFloat(payload, offset, false)).toString();
+                }
+                else {
+                    measure.data = (arrayToInt32(payload, offset, false) / 100.0).toString();
+                }
+                offset += 4
+                decode.measurements.push(measure)
+            }
+
+        }
 
         return true;
     } else if (port === 149 || port === 213) {
