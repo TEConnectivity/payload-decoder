@@ -935,11 +935,27 @@ function DecodeProtocolV2(decode, port, bytes, error) {
                 case "Temperature":
                 case "Humidity":
                 case "Pressure":
+                    decodeSP(decode, meas_data)
                     break;
 
                 default:
                     break;
             }
+        }
+
+        function decodeSP(decode, meas_data) {
+            const sensor_data_type = {
+                0x01: "Float",
+                0x02: "Int32",
+            }
+            decode.sensor_data_type = sensor_data_type[meas_data[0]] || "RFU"
+            if (decode.sensor_data_type === "Float") {
+                decode.data = (arrayToFloat(meas_data, 1, false)).toString();
+            }
+            else {
+                decode.data = (arrayToInt32(meas_data, 1, false) / 100.0).toString();
+            }
+
         }
 
         function decodeVibration(decode, meas_data) {
