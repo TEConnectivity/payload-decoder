@@ -882,7 +882,7 @@ function DecodeProtocolV2(decode, port, bytes, error) {
         const payload = bytes.slice(4)
         switch (decode.frameType) {
             case "DownlinkResponse":
-                DecodeOperationResponses(decode, payload)
+                DecodeOperationResponses(decode, port, payload)
                 break;
             case "KeepAlive":
                 decode.cnt = arrayToInt16(payload)
