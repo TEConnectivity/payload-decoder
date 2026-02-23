@@ -283,8 +283,8 @@ function DecodeOperationResponses(decode, port, bytes) {
         6: "OpErr/PayloadErr",
         5: "ReadOnly/WrongOp",
         4: "NetwErr",
-
     }
+
     decode.op = OperationRepsType[bytes[0] & 0x3];
     decode.opFlag = [];
     for (var i = 7; i > 4; i--) {
@@ -599,7 +599,7 @@ function DecodeTiltSensor(decode, port, bytes) {
 function DecodeSinglePointOrMultiPoint(decode, port, bytes, error) {
 
     if (port === 20) {
-        DecodeOperationResponses(decode, bytes)
+        DecodeOperationResponses(decode, port, bytes)
         return true
     }
 
