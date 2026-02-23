@@ -25,6 +25,13 @@ function decodeUplink(input) {
 }
 
 
+
+// Safe console wrapper (works in TTN and locally). TTN does not export console in its runtime
+const debug = (typeof console !== "undefined" && console.log)
+    ? console.log.bind(console)
+    : function () { };
+
+
 /**
  * 
  * @param {Uint8Array} bytes 
@@ -929,7 +936,6 @@ function DecodeProtocolV2(decode, port, bytes, error) {
             }
 
             const meas_data = payload.slice(offset + 1)
-            console.log(meas_data)
             switch (decode.devtype.sensor) {
                 case "Vibration1Axis":
                 case "Vibration3Axis":
@@ -1397,17 +1403,17 @@ function dBDecompression(val) {
 function getBits(number, index, size) {
     // Input validation
     if (number < 0) {
-        console.error("Invalid input. Please provide a non-negative number.")
+        debug("Invalid input. Please provide a non-negative number.")
         return null;
     }
 
     if (typeof index !== 'number' || index < 0) {
-        console.error("Invalid index input. Please provide a non-negative number.");
+        debug("Invalid index input. Please provide a non-negative number.");
         return null;
     }
 
     if (typeof size !== 'number' || size < 1) {
-        console.error("Invalid size input. Please provide a positive number.");
+        debug("Invalid size input. Please provide a positive number.");
         return null;
     }
 
