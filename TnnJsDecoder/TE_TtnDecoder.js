@@ -1041,7 +1041,7 @@ function DecodeProtocolV2(decode, port, bytes, error) {
                 case 1:
                     decode.vibration_data.spectrum_rms = arrayConverter(vib_raw_data, 0, 2, false)
                     decode.vibration_data.time_p2p = arrayConverter(vib_raw_data, 2, 2, false)
-                    decode.vibration_data.velocity = arrayConverter(vib_raw_data, 4, 2, false)
+                    decode.vibration_data.velocity = arrayConverter(vib_raw_data, 4, 2, false) / 100.0
                     decode.vibration_data.windows = []
 
                     let windowSize = 14
@@ -1095,7 +1095,7 @@ function DecodeProtocolV2(decode, port, bytes, error) {
                 case 2:
                     decode.vibration_data.spectrum_rms = arrayConverter(vib_raw_data, 0, 2, false)
                     decode.vibration_data.time_p2p = arrayConverter(vib_raw_data, 2, 2, false)
-                    decode.vibration_data.velocity = arrayConverter(vib_raw_data, 4, 2, false)
+                    decode.vibration_data.velocity = arrayConverter(vib_raw_data, 4, 2, false) / 100.0
 
                     decode.vibration_data.window_count = vib_raw_data[6]
 
